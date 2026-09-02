@@ -293,3 +293,33 @@
   * **Foreign Keys**: `clubId` in `Event`, `authorId` in `Post` (accelerates `JOIN`s).
   * **Unique Identifiers**: `email` in `User`, `slug` in `Club` (accelerates lookups).
   * **Filter & Sort Columns**: `startTime` in `Event`, `createdAt` in `Post` (accelerates `WHERE` and `ORDER BY` queries).
+
+### Q40: Does random UUIDv4 make it difficult to index? What is B-Tree Page Fragmentation, and how do time-ordered IDs (UUIDv7, CUID2) solve it?
+* **The Problem with Random UUIDv4**:
+  * Auto-incrementing integers (`1, 2, 3...`) append sequentially to the rightmost leaf of a B-Tree index with 100% sequential I/O and zero re-shuffling.
+  * Random UUIDv4 values are scattered uniformly across the entire hexadecimal space. New inserts land in the middle of arbitrary 8KB B-Tree pages on disk.
+  * When an 8KB page is full, the database engine must perform a **B-Tree Page Split** (allocates a new page, moves 50% of the keys, updates parent pointers).
+  * **Consequences at Scale**: Random disk write spikes, index bloat (pages only 50%–70% full), and rapid cache eviction in RAM.
+* **Why PostgreSQL Handles UUIDs Better than MySQL**:
+  * PostgreSQL uses **Heap Tables** where rows live in unordered heap blocks; only the 16-byte index node splits.
+  * In MySQL (InnoDB), the table data is physically stored *inside* the primary key B-Tree (**Clustered Index**), meaning page splits physically move entire heavy table rows on disk.
+* **The Solution (UUIDv7 & CUID2)**:
+  * **UUIDv7**: Combines a 48-bit UNIX timestamp (milliseconds) at the beginning + 74 bits of cryptographic randomness.
+  * Because IDs are naturally sorted by time (**k-sortable**), inserts append sequentially ($O(1)$) with zero page splits while preventing enumeration/guessing attacks.
+
+### Q41: Compare UUIDv7 vs. Twitter Snowflake IDs: How do they work, and when do you choose which?
+* **1. Structure & Storage**:
+  * **UUIDv7 (128 bits / 16 bytes)**: 48-bit timestamp + 74-bit random entropy. Formatted as standard 36-char hex string.
+  * **Twitter Snowflake (64 bits / 8 bytes)**: 1-bit sign + 41-bit timestamp offset + 10-bit machine/datacenter ID + 12-bit sequence counter. Stored as `BIGINT`.
+* **2. Coordination Requirements**:
+  * **UUIDv7 is Zero-Coordination**: Any server, worker, or client generates IDs independently without talking to a central coordinator.
+  * **Snowflakes Require Machine ID Allocation**: Each generator node must be assigned a unique `worker_id` (0–1023) via ZooKeeper, Redis, or Kubernetes StatefulSets to prevent duplicate ID generation in the same millisecond.
+* **3. Security & Anti-Scraping**:
+  * **UUIDv7**: Cryptographically unpredictable (74 bits of entropy).
+  * **Snowflake**: Predictable sequence. Attackers can easily deduce exact creation rates, server counts, and timestamps.
+* **4. JavaScript Number Precision Gotcha**:
+  * JS numbers are 64-bit floats with a maximum safe integer limit of $2^{53} - 1$ (`9,007,199,254,740,991`).
+  * 64-bit Snowflakes exceed this limit and **will be corrupted/rounded by web browsers** unless serialized as strings in JSON. UUIDv7 is already a string/byte buffer, immune to truncation.
+* **Decision Framework**:
+  * Choose **Snowflake** at hyper-scale (billions of messages/day like Discord/Twitter) to shave 8 bytes per row across billions of records where worker ID infrastructure exists.
+  * Choose **UUIDv7** for modern web applications (like CampusHub) for zero-coordination, stateless architecture, anti-scraping security, and native RFC standards compliance.
