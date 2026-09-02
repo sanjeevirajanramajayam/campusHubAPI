@@ -323,3 +323,27 @@
 * **Decision Framework**:
   * Choose **Snowflake** at hyper-scale (billions of messages/day like Discord/Twitter) to shave 8 bytes per row across billions of records where worker ID infrastructure exists.
   * Choose **UUIDv7** for modern web applications (like CampusHub) for zero-coordination, stateless architecture, anti-scraping security, and native RFC standards compliance.
+
+### Q42: How does Graceful Shutdown coordinate with Database Connection Pools? Why must `server.close()` be called before `prisma.$disconnect()`?
+* **The Danger of Sudden Process Death**:
+  * If a server terminates immediately during a deployment, in-flight transactions are abruptly severed, leaving users with broken connections (`502 Bad Gateway`) or aborted database writes.
+* **The 2-Phase Teardown Order**:
+  * **Phase 1: `server.close()`**: Express stops listening for new incoming HTTP requests, but allows all currently active, in-flight requests to finish running their code and executing their database queries.
+  * **Phase 2: `prisma.$disconnect()`**: Runs **inside the callback** of `server.close()`. Only after every active HTTP request has returned its response to the client do we drain and close the PostgreSQL connection pool. If you disconnect Prisma first, in-flight queries crash with `PrismaClientInitializationError`.
+* **The Safety Timeout**:
+  * A fallback timer (e.g. 10s) ensures that if an external client hangs an open socket or a deadlock stalls, the process forcefully terminates (`process.exit(1)`) rather than hanging indefinitely before orchestrator `SIGKILL`.
+
+### Q43: Express vs. Fastify vs. NestJS: What do companies use in the wild, and why did we choose Express?
+* **1. Express.js**:
+  * **Role**: The unopinionated "C standard library" of Node.js web frameworks. Minimalist, flexible, universal.
+  * **In the Wild**: Massive production usage across PayPal, Uber, IBM, Stripe, and thousands of enterprise microservices.
+  * **Why we use it for CampusHub**: It doesn't hide anything behind magic annotations. You learn fundamental architecture (routing, middlewares, error boundaries, dependency injection) from first principles.
+* **2. Fastify**:
+  * **Role**: Performance-first HTTP framework.
+  * **Key Innovations**: High-speed JSON serialization (`fast-json-stringify`), schema-based route compilation, built-in asynchronous hook lifecycle, and first-class TypeScript support.
+  * **In the Wild**: High-throughput microservices, fintech gateways, and real-time APIs where raw request-per-second throughput is the bottleneck.
+* **3. NestJS**:
+  * **Role**: Heavily opinionated, enterprise application framework (Angular for the backend).
+  * **Key Innovations**: Heavy reliance on TypeScript decorators (`@Controller()`, `@Injectable()`), built-in IoC container for Dependency Injection, and module architecture. Under the hood, NestJS is just an abstraction wrapper on top of Express or Fastify!
+  * **In the Wild**: Enterprise teams with large developer headcounts (e.g., enterprise banks, healthcare) needing strict, uniform patterns so 50 developers write code in the exact same style.
+  * **The Trade-off**: High decorator overhead, magic abstractions that obscure how Node.js actually works, and slower startup times.
