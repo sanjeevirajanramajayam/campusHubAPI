@@ -13,6 +13,7 @@
 5. [Error Architecture & Exception Hierarchy: AppError](#5-error-architecture--exception-hierarchy-apperror)
 6. [Express Middleware Pipeline, Security & HTTP Standards](#6-express-middleware-pipeline-security--http-standards)
 7. [Process Lifecycle, Signals & Graceful Shutdown](#7-process-lifecycle-signals--graceful-shutdown)
+8. [Database Fundamentals, ORMs & Prisma](#8-database-fundamentals-orms--prisma)
 
 ---
 
@@ -216,3 +217,45 @@
 * In UNIX operating systems and CI/CD pipelines:
   * **Exit Code `0`**: Indicates success. Container orchestrators and CI/CD tools treat `0` as a normal, expected completion.
   * **Exit Code `1` (or non-zero)**: Indicates failure/crash. Container orchestrators (Docker, Kubernetes) recognize non-zero exit codes and automatically trigger container restart policies or fail CI/CD deployments.
+
+---
+
+## 8. Database Fundamentals, ORMs & Prisma
+
+### Q30: What is an ORM (Object-Relational Mapping) and what is the "Object-Relational Impedance Mismatch"?
+* **The Impedance Mismatch Problem**:
+  * Relational databases store data in **flat tabular rows and columns** joined by foreign keys (`user_id = 42`).
+  * TypeScript/Node.js code processes data in **nested objects, classes, and arrays** (`post.author.email`).
+* **Role of the ORM**:
+  * An ORM is the software bridge that translates database rows into typed TypeScript objects, and translates TypeScript function calls (`prisma.user.findUnique(...)`) into optimized SQL queries.
+
+### Q31: How do ORMs prevent SQL Injection 100%? (AST Compilation vs String Concatenation)
+* **Vulnerable String Concatenation**:
+  * Query: `"SELECT * FROM users WHERE email = '" + input + "'"`
+  * If input is `' OR '1'='1`, the SQL parser executes boolean operations and dumps the table.
+* **Secure Parameterized Queries (How ORMs work)**:
+  * Query: `SELECT * FROM users WHERE email = $1`, Parameters: `["' OR '1'='1"]`
+  * The PostgreSQL parser compiles the **Abstract Syntax Tree (AST)** *first*. The database engine knows `$1` is strictly literal text data, meaning user inputs can never be interpreted as executable SQL commands.
+
+### Q32: Compare the 3 Database Access Paradigms in Node.js: Active Record, Query Builders, and Schema-First Data Mappers.
+* **1. Active Record (TypeORM / Sequelize)**:
+  * Models are classes with active methods (`user.save()`, `user.remove()`).
+  * *Downside*: Tightly couples domain entities with database persistence concerns.
+* **2. Query Builders (Knex / Kysely / Drizzle)**:
+  * Programmatic SQL builders (`db.select().from('users').where(...)`).
+  * *Upside*: Ultra-fast and lightweight; close to raw SQL.
+  * *Downside*: Requires manual schema synchronization without automated schema DSLs.
+* **3. Schema-First Data Mappers (Prisma - Our Choice)**:
+  * Declarative single source of truth (`prisma/schema.prisma`).
+  * Generates an end-to-end type-safe client tailored specifically to your schema.
+  * Clean separation: Services do not need to know database table schemas directly.
+
+### Q33: Why did we choose Prisma for CampusHub?
+* **End-to-End Type Safety**: If you rename a database column in `schema.prisma`, running `prisma generate` immediately causes TypeScript to flag every affected file in your codebase at compile time.
+* **Automated, Version-Controlled Migrations**: `prisma migrate dev` generates timestamped `.sql` files committed to Git, guaranteeing schema consistency across local dev, CI/CD, and production.
+* **Declarative Nested Relations**: Simplifies multi-table queries (`include: { events: true, members: { include: { user: true } } }`) without writing brittle raw SQL `JOIN` statements.
+
+### Q34: What are the trade-offs, pitfalls, and limitations of ORMs?
+* **1. The N+1 Query Problem**: Executing database queries in a loop rather than using `include`, `select`, or batching (`WHERE id IN (...)`).
+* **2. Complex Analytical Queries**: For large-scale reporting with window functions, recursive CTEs, or geospatial calculations, ORMs can generate heavy SQL. *(Prisma provides `prisma.$queryRaw` for writing optimized raw SQL when needed)*.
+* **3. Memory Overhead**: Mapping thousands of database rows into JavaScript objects consumes more memory than streaming raw byte buffers.
