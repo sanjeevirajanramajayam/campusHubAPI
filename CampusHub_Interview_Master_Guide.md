@@ -430,3 +430,15 @@
 * **The Multi-Tab Race Condition & Grace Period**:
   * *Problem*: If a user has 5 browser tabs open, all 5 tabs may hit `/auth/refresh` at the same second with the same token. Tab 1 rotates the token; Tabs 2–5 could be falsely flagged as attackers and log the user out!
   * *Solution*: Introduce a **15-to-30 second Grace Period**. If a token marked `isUsed: true` is presented within 15 seconds of its initial rotation, the server recognizes concurrent browser tabs and returns the already-issued new token without triggering security panic. Replay attempts after the grace window trigger immediate family revocation.
+
+### Q50: How do you manage multi-repository database transactions without leaking ORM details into services? (The Unit of Work Pattern)
+* **The Dilemma (Cross-Repository Atomicity)**:
+  * Operations spanning multiple repositories (e.g. `EventRepository.incrementCount` + `RegistrationRepository.create` + `UserRepository.deductPoints`) must succeed or fail as an atomic unit (ACID Atomicity).
+  * Calling `prisma.$transaction()` directly inside a Service destroys the repository abstraction and couples business logic to Prisma query syntax.
+* **The Unit of Work (UoW) Pattern Solution**:
+  * Define an `IUnitOfWork` interface with a `runInTransaction(work: (repos: ITransactionalRepos) => Promise<T>)` method.
+  * The concrete `PrismaUnitOfWork` manages the underlying `prisma.$transaction(async (tx) => ...)` lifecycle and passes repository instances bound to the transactional client `tx`.
+  * **Automatic Rollback**: If any operation in the callback throws an error, PostgreSQL rolls back all operations across all repositories cleanly.
+* **Architectural Benefits**:
+  * **Zero Leaky Abstractions**: Business services coordinate multi-table ACID transactions without knowing whether the database uses `BEGIN/COMMIT/ROLLBACK` or Prisma syntax.
+  * **100% Unit Testability**: We can inject a `MockUnitOfWork` in unit tests that executes the callback without any live database, testing business flows in milliseconds.
