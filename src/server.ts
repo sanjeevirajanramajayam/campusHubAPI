@@ -1,6 +1,7 @@
 import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { logger } from './common/logger.js';
+import { prisma } from './infrastructure/prisma/client.js';
 
 const app = createApp();
 
@@ -19,12 +20,17 @@ const server = app.listen(env.PORT, () => {
  * Graceful shutdown stops accepting new HTTP connections and allows in-flight
  * requests to complete cleanly before closing database pools and exiting.
  */
-const handleShutdown = (signal: string) => {
+const handleShutdown = async (signal: string) => {
   logger.info(`Received ${signal}. Starting graceful shutdown...`);
 
-  server.close(() => {
-    logger.info('HTTP server closed.');
-    // In future phases: disconnect Prisma (prisma.$disconnect()) and Redis (redis.quit())
+  server.close(async () => {
+    logger.info('HTTP server closed. Disconnecting database pools...');
+    try {
+      await prisma.$disconnect();
+      logger.info('Database pool disconnected.');
+    } catch (err) {
+      logger.error({ err }, 'Error while disconnecting database pool');
+    }
     logger.info('Clean shutdown complete.');
     process.exit(0);
   });
