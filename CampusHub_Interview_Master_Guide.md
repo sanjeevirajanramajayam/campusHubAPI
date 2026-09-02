@@ -347,3 +347,31 @@
   * **Key Innovations**: Heavy reliance on TypeScript decorators (`@Controller()`, `@Injectable()`), built-in IoC container for Dependency Injection, and module architecture. Under the hood, NestJS is just an abstraction wrapper on top of Express or Fastify!
   * **In the Wild**: Enterprise teams with large developer headcounts (e.g., enterprise banks, healthcare) needing strict, uniform patterns so 50 developers write code in the exact same style.
   * **The Trade-off**: High decorator overhead, magic abstractions that obscure how Node.js actually works, and slower startup times.
+
+---
+
+## 9. Authentication, Cryptography & Architecture Patterns
+
+### Q44: Why use Argon2id over bcrypt for password hashing? What is "Memory-Hardness"?
+* **The Fatal Flaw of Fast Hashes (SHA-256)**:
+  * Hashes like SHA-256 calculate billions of hashes per second. If a database is stolen, GPU rigs crack millions of passwords in seconds.
+* **Why bcrypt is Aging (Compute-bound vs Memory-bound)**:
+  * bcrypt requires negligible RAM (~4KB). Attackers build GPU and ASIC clusters where thousands of tiny GPU cores brute-force bcrypt in parallel without running out of memory.
+* **Argon2id: The Memory-Hard Champion (PHC Winner / RFC 9106)**:
+  * Argon2 introduces a **configurable memory cost** (e.g. 64MB of RAM per hash).
+  * A server CPU handles 64MB per login easily. But an attacker's 24GB GPU can only fit $24\text{GB} / 64\text{MB} \approx 375$ attempts in parallel before running out of VRAM!
+  * **Argon2id Hybrid Variant**: Combines data-independent memory passes (defeating cache-timing side-channels) with data-dependent passes (defeating GPU cracking).
+
+### Q45: What is the Repository Pattern, and why use it if Prisma is already an ORM?
+* **Core Concept (Domain-Driven Design)**:
+  * Mediates between the domain service layer and data mapping layer, acting like an in-memory collection of domain objects.
+* **Problems with Direct ORM Calls in Services**:
+  * **Zero Testability**: Services calling `prisma.user.create()` cannot be unit-tested without a running PostgreSQL container.
+  * **Violates Dependency Inversion (SOLID)**: High-level business logic is tightly coupled to Prisma's specific query syntax.
+  * **Scattered Queries**: Complex multi-clause `where` filters are duplicated across multiple service files.
+* **The Solution (Interface + Implementation)**:
+  * Define an interface contract: `IUserRepository` declaring domain methods (`findByEmail`, `create`).
+  * Implement `PrismaUserRepository implements IUserRepository` for production.
+  * In unit tests, inject an in-memory `MockUserRepository` (using a JavaScript `Map`) that runs in 2 milliseconds with no database needed.
+* **"Isn't Prisma already a Repository?" (Interview Counter-Question)**:
+  * Prisma is a generic **Data Mapper / Query Builder** (`findMany`, `groupBy`, `aggregate`). A domain repository exposes **domain-specific business queries** (`findUpcomingEventsForClub`), encapsulating database details and query optimization in a single location.
