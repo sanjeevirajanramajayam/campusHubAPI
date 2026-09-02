@@ -375,3 +375,17 @@
   * In unit tests, inject an in-memory `MockUserRepository` (using a JavaScript `Map`) that runs in 2 milliseconds with no database needed.
 * **"Isn't Prisma already a Repository?" (Interview Counter-Question)**:
   * Prisma is a generic **Data Mapper / Query Builder** (`findMany`, `groupBy`, `aggregate`). A domain repository exposes **domain-specific business queries** (`findUpcomingEventsForClub`), encapsulating database details and query optimization in a single location.
+
+### Q46: Which SOLID principles are violated when services call the ORM or database directly without a Repository?
+* **1. Dependency Inversion Principle (D of SOLID) - PRIMARY VIOLATION**:
+  * *Rule*: High-level modules should not depend on low-level modules; both should depend on abstractions.
+  * *Violation*: `AuthService` (high-level business rules) imports and calls `PrismaClient` (low-level database I/O library) directly. The business logic is held hostage by the database vendor, making unit testing impossible without live DB instances.
+  * *Fix*: `AuthService` depends on `IUserRepository` interface; `PrismaUserRepository` implements it.
+* **2. Single Responsibility Principle (S of SOLID) - SECONDARY VIOLATION**:
+  * *Rule*: A module should have one, and only one, reason to change.
+  * *Violation*: `AuthService` has two reasons to change: (1) business logic changes (e.g. password rules), and (2) database persistence changes (e.g. query optimization, column renaming, table splits).
+  * *Fix*: `AuthService` handles authentication workflow; `UserRepository` handles PostgreSQL query mechanics.
+* **How It Empowers the Other Principles (O, L, I)**:
+  * **Open/Closed (O)**: We can introduce a Redis-cached or in-memory repository without modifying existing service code.
+  * **Liskov Substitution (L)**: `PrismaUserRepository` and `MockUserRepository` can be substituted interchangeably without altering application correctness.
+  * **Interface Segregation (I)**: Dedicated, targeted interfaces (`IUserRepository`, `IClubRepository`) instead of one bloated monolithic data access interface.
