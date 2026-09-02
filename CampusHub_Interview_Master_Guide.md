@@ -460,3 +460,22 @@
   * Evaluated atomically at row-level by PostgreSQL engine. If rows affected = 1, proceed to insert registration. If 0, event is full. Zero deadlock risk, zero retry loops.
 * **Strategy 4: High-Scale In-Memory Redis Counter (`DECR`)**:
   * For hyper-scale (e.g. 100k req/sec flash sales), decrement available seats in Redis first via atomic Lua script. Only the 50 winning requests are permitted to write to PostgreSQL.
+
+### Q52: What is Inversion of Control (IoC), what is an IoC Container, and what does "Registering" mean?
+* **What is Inversion of Control (The Car Analogy)**:
+  * In traditional code, a `Car` builds its own parts (`this.engine = new V8Engine()`). The class controls its dependencies.
+  * In IoC, the class **inverts/hands over control**: `constructor(engine: Engine)`. It receives pre-assembled parts from the outside.
+* **The Problem of Deep Dependency Graphs (Wiring Fatigue)**:
+  * In large apps, instantiating `new Controller(new Service(new Repo(new DB()), new Hasher(), new Mailer()))` results in dozens of lines of manual constructor plumbing.
+* **What is an IoC Container? (The Robot Factory)**:
+  * A smart registry/tool (like TSyringe, Awilix, or NestJS) that auto-resolves dependency trees. You call `container.resolve(AuthController)`, and it recursively builds every required dependency in topological order.
+* **What Does "Registering" Mean?**:
+  * An IoC container is internally a dictionary (`Map<token, recipe>`).
+  * Because interfaces (`IUserRepository`) disappear at runtime after TypeScript compiles, the container cannot guess which concrete class to instantiate.
+  * **Registering** is adding an entry to the phone book:  
+    `container.register('IUserRepository', { useClass: PrismaUserRepository });`  
+    It tells the container: *"Whenever any service requests `IUserRepository`, instantiate and supply `PrismaUserRepository`."*
+* **The 3 Registration Lifecycles**:
+  * **Singleton**: Created once when the app boots and shared across all requests (e.g. `PrismaClient`, `Redis`).
+  * **Transient**: A fresh instance is created every time it is injected.
+  * **Scoped / Request-Scoped**: Created once per incoming HTTP request and destroyed after `res.send()` (e.g. `RequestContext`, multi-tenant DB transactions).
