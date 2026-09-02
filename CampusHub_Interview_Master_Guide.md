@@ -389,3 +389,16 @@
   * **Open/Closed (O)**: We can introduce a Redis-cached or in-memory repository without modifying existing service code.
   * **Liskov Substitution (L)**: `PrismaUserRepository` and `MockUserRepository` can be substituted interchangeably without altering application correctness.
   * **Interface Segregation (I)**: Dedicated, targeted interfaces (`IUserRepository`, `IClubRepository`) instead of one bloated monolithic data access interface.
+
+### Q47: How do you implement the Cache-Aside Pattern using the Decorator Pattern and Dependency Injection?
+* **The Problem with Naive Caching in Services**:
+  * Injecting a Redis client directly into `UserService` pollutes business logic with low-level caching concerns (JSON stringification, TTL management, cache keys). It violates Single Responsibility and the Open/Closed Principle.
+* **The Decorator Solution (`CachedUserRepository`)**:
+  * Create a class `CachedUserRepository` that implements the exact same `IUserRepository` contract.
+  * It accepts **both** the real `PrismaUserRepository` and `Redis` via its constructor.
+  * **Read Operation (`findById`)**: Checks Redis first (`user:${id}`). On cache hit, parses and returns JSON. On cache miss, delegates to `innerRepo.findById()`, writes the result to Redis with a TTL, and returns the data.
+  * **Write Operation (`update`, `delete`)**: Calls `innerRepo.update()`, and automatically invalidates the Redis key (`redis.del()`).
+* **Architectural Benefits**:
+  * **Pure Open/Closed Principle**: We add a complete distributed caching layer without altering a single line of code in `UserService` or `PrismaUserRepository`.
+  * **Toggable via DI**: In production, inject `new CachedUserRepository(realRepo, redis)`. In testing or local dev, inject `realRepo` directly.
+  * **Liskov Substitution**: `CachedUserRepository` is 100% swappable anywhere `IUserRepository` is expected.
