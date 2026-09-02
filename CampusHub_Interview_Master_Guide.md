@@ -154,18 +154,34 @@
 * If you omit `next`, `fn.length` becomes 3, and Express will treat it as a standard route middleware, completely ignoring it when an error is thrown.
 
 ### Q20: What do Helmet and CORS do at the HTTP level?
-* **Helmet**: Sets essential security response headers:
-  * `X-Content-Type-Options: nosniff`: Prevents browsers from guessing MIME types (MIME-sniffing attacks).
-  * `Strict-Transport-Security` (HSTS): Enforces secure HTTPS connections.
-  * `X-Frame-Options: SAMEORIGIN`: Protects against Clickjacking attacks inside `<iframe>` tags.
+* **Helmet**: Sets essential security response headers to secure Express applications from common web vulnerabilities.
 * **CORS (Cross-Origin Resource Sharing)**:
   * Browsers block frontend clients (e.g. `http://localhost:3000`) from reading responses from a different backend origin (`http://localhost:5000`).
   * `cors()` middleware handles browser preflight `OPTIONS` requests and sends `Access-Control-Allow-Origin` headers.
 
-### Q21: Why pass `{ limit: '1mb' }` to `express.json()`?
+### Q21: Why Helmet Matters: What are the key headers set by Helmet and what attacks do they mitigate?
+* **1. Blocks XSS Attacks (`Content-Security-Policy`)**:
+  * Adds the `Content-Security-Policy` (CSP) header which restricts where scripts, styles, and images can be loaded from. This mitigates a large number of injection attacks like Cross-Site Scripting (XSS).
+* **2. Prevents Clickjacking (`X-Frame-Options`)**:
+  * Adds `X-Frame-Options: SAMEORIGIN` so malicious external websites cannot trap or embed your application inside a hidden or transparent `<iframe>` overlay to hijack user clicks.
+* **3. Hides Server Details (`Hide X-Powered-By`)**:
+  * Removes the default `X-Powered-By: Express` header to stop attackers from fingerprinting that the backend runs on Express/Node.js and scanning for framework-specific CVE vulnerabilities.
+* **4. Stops MIME Sniffing (`X-Content-Type-Options`)**:
+  * Sets `X-Content-Type-Options: nosniff` so browsers strictly follow the server's declared `Content-Type` instead of guessing or executing arbitrary uploaded files (e.g. executing a `.txt` as `.js`).
+* **5. Enforces HTTPS (`Strict-Transport-Security` / HSTS)**:
+  * Adds the HSTS header to force all future browser connections to use encrypted HTTPS, preventing SSL-stripping and Man-in-the-Middle (MITM) attacks.
+
+### Q22: When does Helmet need custom configuration in real-world production backends?
+* **When serving Swagger/OpenAPI Docs (`/api-docs`)**: Default CSP blocks inline CSS/JS used by Swagger UI.
+* **When loading assets from S3 / Cloudinary**: Default `Cross-Origin-Resource-Policy (CORP)` and `imgSrc` CSP will block cross-origin images unless configured with `crossOriginResourcePolicy: { policy: "cross-origin" }`.
+
+### Q23: Does using Helmet make an Express application completely secure?
+* **No**. Helmet only instructs the browser how to behave via HTTP headers. It cannot protect against SQL Injection (mitigated by Prisma/parameterized queries), Broken Access Control / IDOR, Rate Limiting / DDoS, or business logic flaws.
+
+### Q24: Why pass `{ limit: '1mb' }` to `express.json()`?
 * **Denial of Service (DoS) Prevention**: If a malicious client sends a 500MB JSON payload in a `POST` request, the server will attempt to buffer and parse the entire string in memory, exhausting RAM and locking the event loop. Setting a 1MB limit immediately rejects oversized payloads with `HTTP 413 Payload Too Large`.
 
-### Q22: What is the semantic difference between HTTP Status Codes: 400, 401, 403, 404, 409, 422, and 500?
+### Q25: What is the semantic difference between HTTP Status Codes: 400, 401, 403, 404, 409, 422, and 500?
 * **400 Bad Request**: General client error (malformed JSON syntax, invalid query parameter).
 * **401 Unauthorized**: Missing or invalid authentication (not logged in / invalid token). *"Who are you?"*
 * **403 Forbidden**: Authenticated, but lacking permission for this resource (e.g., student trying to access admin dashboard). *"You are not allowed here."*
@@ -178,7 +194,7 @@
 
 ## 7. Process Lifecycle, Signals & Graceful Shutdown
 
-### Q23: What is "Graceful Shutdown" in Node.js and why is it mandatory in containerized environments?
+### Q26: What is "Graceful Shutdown" in Node.js and why is it mandatory in containerized environments?
 * When Docker, Kubernetes, or AWS stops a container, it sends an OS signal: `SIGTERM` (terminate) or `SIGINT` (Ctrl+C).
 * **Without Graceful Shutdown**: The process dies instantly. Ongoing database writes are corrupted, active file uploads break, and connected users receive network drops.
 * **With Graceful Shutdown (`server.close()`)**:
@@ -188,15 +204,15 @@
   4. Process exits with `process.exit(0)`.
   5. A 10-second timeout ensures the process exits forcefully if a connection hangs.
 
-### Q24: What is the difference between `SIGTERM` and `SIGKILL`?
+### Q27: What is the difference between `SIGTERM` and `SIGKILL`?
 * **`SIGTERM` (Signal 15)**: A graceful termination signal sent to a process. The process can listen to it (`process.on('SIGTERM')`), execute cleanup code, and shut down cleanly.
 * **`SIGKILL` (Signal 9)**: An immediate kill signal executed directly by the OS kernel. It **cannot be intercepted, caught, or ignored** by the process. If a process does not exit after receiving `SIGTERM` within a grace period (e.g. 30s), orchestrators send `SIGKILL`.
 
-### Q25: What is the difference between `uncaughtException` and `unhandledRejection`?
+### Q28: What is the difference between `uncaughtException` and `unhandledRejection`?
 * **`uncaughtException`**: Triggered when a synchronous JavaScript exception is thrown outside of any `try/catch`. The process state is considered corrupted, so the logger records the error and the process must terminate (`process.exit(1)`).
 * **`unhandledRejection`**: Triggered when a `Promise` is rejected (e.g., an `async` database query error) without a `.catch()` block or `try/catch` handler.
 
-### Q26: Why use `process.exit(1)` on error instead of `process.exit(0)`?
+### Q29: Why use `process.exit(1)` on error instead of `process.exit(0)`?
 * In UNIX operating systems and CI/CD pipelines:
   * **Exit Code `0`**: Indicates success. Container orchestrators and CI/CD tools treat `0` as a normal, expected completion.
   * **Exit Code `1` (or non-zero)**: Indicates failure/crash. Container orchestrators (Docker, Kubernetes) recognize non-zero exit codes and automatically trigger container restart policies or fail CI/CD deployments.
