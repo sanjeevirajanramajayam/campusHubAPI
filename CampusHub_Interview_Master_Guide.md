@@ -402,3 +402,16 @@
   * **Pure Open/Closed Principle**: We add a complete distributed caching layer without altering a single line of code in `UserService` or `PrismaUserRepository`.
   * **Toggable via DI**: In production, inject `new CachedUserRepository(realRepo, redis)`. In testing or local dev, inject `realRepo` directly.
   * **Liskov Substitution**: `CachedUserRepository` is 100% swappable anywhere `IUserRepository` is expected.
+
+### Q48: How does the Strategy Pattern enable Polymorphic Notification Delivery with Dependency Injection?
+* **The Anti-Pattern (The Monolithic `switch/case`)**:
+  * Handling multiple delivery channels (Email, Push, SMS, Discord) inside one service with `if/else` creates a fragile class tightly coupled to multiple external SDKs (Nodemailer, Firebase, Twilio). Adding a new channel violates the Open/Closed Principle.
+* **The Strategy Pattern Solution**:
+  * Define an abstraction: `INotificationSender` with method `send(payload: NotificationPayload)`.
+  * Create separate, isolated strategy classes: `EmailNotificationSender`, `PushNotificationSender`, `DiscordWebhookSender`.
+  * The orchestrator (`NotificationDispatcher`) receives a registry of senders via **Constructor Injection**.
+* **Polymorphism at Runtime**:
+  * `NotificationDispatcher.dispatch(channel, payload)` simply looks up the strategy and calls `sender.send()`. It has zero knowledge of how emails or push notifications are physically transmitted.
+* **Architectural Benefits**:
+  * **Open/Closed Principle**: Adding a new channel (e.g. SMS) requires only creating `SmsNotificationSender implements INotificationSender` without touching existing dispatchers.
+  * **Unit Testability**: Pass a `MockNotificationSender` in tests that records notifications in memory, sending 0 network requests.
