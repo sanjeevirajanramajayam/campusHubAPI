@@ -442,3 +442,21 @@
 * **Architectural Benefits**:
   * **Zero Leaky Abstractions**: Business services coordinate multi-table ACID transactions without knowing whether the database uses `BEGIN/COMMIT/ROLLBACK` or Prisma syntax.
   * **100% Unit Testability**: We can inject a `MockUnitOfWork` in unit tests that executes the callback without any live database, testing business flows in milliseconds.
+
+### Q51: How do you solve the Event Ticketing Overselling Race Condition under high concurrency?
+* **The Race Condition (Check-Then-Act)**:
+  * 2 concurrent requests read `registered = 99, capacity = 100`. Both see 1 seat remaining. Both insert registrations and increment count. The event is oversold to 101/100 seats.
+* **Strategy 1: Pessimistic Locking (`SELECT FOR UPDATE`)**:
+  * Places an exclusive PostgreSQL row lock on the event during the transaction: `SELECT * FROM events WHERE id = $1 FOR UPDATE`.
+  * Concurrent requests are forced to wait in line until the lock is released.
+  * *Trade-off*: High safety, but lower throughput under massive contention (queuing connections).
+* **Strategy 2: Optimistic Locking (`version` Column)**:
+  * Add a `version Int @default(1)` column.
+  * Update query: `UPDATE events SET registered = 100, version = 2 WHERE id = $1 AND version = 1;`.
+  * If affected rows = 0, another request updated first; the losing request aborts or retries.
+  * *Trade-off*: High throughput when contention is low; high CPU waste/retries under extreme contention.
+* **Strategy 3: Atomic SQL Conditional Update (Recommended for CampusHub)**:
+  * Single atomic statement: `UPDATE events SET registered = registered + 1 WHERE id = $1 AND registered < capacity;`.
+  * Evaluated atomically at row-level by PostgreSQL engine. If rows affected = 1, proceed to insert registration. If 0, event is full. Zero deadlock risk, zero retry loops.
+* **Strategy 4: High-Scale In-Memory Redis Counter (`DECR`)**:
+  * For hyper-scale (e.g. 100k req/sec flash sales), decrement available seats in Redis first via atomic Lua script. Only the 50 winning requests are permitted to write to PostgreSQL.
