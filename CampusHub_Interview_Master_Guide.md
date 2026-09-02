@@ -415,3 +415,18 @@
 * **Architectural Benefits**:
   * **Open/Closed Principle**: Adding a new channel (e.g. SMS) requires only creating `SmsNotificationSender implements INotificationSender` without touching existing dispatchers.
   * **Unit Testability**: Pass a `MockNotificationSender` in tests that records notifications in memory, sending 0 network requests.
+
+### Q49: How does JWT Refresh Token Rotation work with Token Families, and how do you handle the Multi-Tab Concurrency Race Condition?
+* **Why Static Refresh Tokens are Vulnerable**:
+  * If a long-lived 30-day refresh token is stolen (via XSS, compromised extension, or public Wi-Fi), the attacker silently impersonates the user for a month without detection.
+* **How Tokens are Stolen in the Real World**:
+  * **XSS + `localStorage`**: Storing tokens in `localStorage` allows malicious scripts to run `localStorage.getItem()` and exfiltrate credentials. *(Mitigated by `HttpOnly`, `SameSite=Strict` cookies)*.
+  * **Database Dumps**: Storing raw JWT tokens in SQL exposes all active sessions if DB is breached. *(Mitigated by hashing refresh tokens with SHA-256 before database storage)*.
+  * **MITM Packet Sniffing**: Cleartext Wi-Fi snooping. *(Mitigated by `Secure: true` cookie flag and Helmet HSTS)*.
+* **Token Family Rotation (RTR)**:
+  * Tokens belong to a cryptographic lineage (`familyId`).
+  * Tokens are strictly **single-use**. Every refresh request invalidates the old token (`isUsed: true`) and returns a new access token + new rotated refresh token in the cookie.
+  * **Automated Theft Detection**: If an attacker attempts to reuse an already-invalidated token, the server identifies token replay and **instantly revokes the entire family**, locking out both the attacker and forcing the user to re-authenticate (Fail-Closed Security).
+* **The Multi-Tab Race Condition & Grace Period**:
+  * *Problem*: If a user has 5 browser tabs open, all 5 tabs may hit `/auth/refresh` at the same second with the same token. Tab 1 rotates the token; Tabs 2–5 could be falsely flagged as attackers and log the user out!
+  * *Solution*: Introduce a **15-to-30 second Grace Period**. If a token marked `isUsed: true` is presented within 15 seconds of its initial rotation, the server recognizes concurrent browser tabs and returns the already-issued new token without triggering security panic. Replay attempts after the grace window trigger immediate family revocation.
