@@ -279,3 +279,17 @@
 ### Q38: Why do we use Named Volumes (`postgres_data:/var/lib/postgresql/data`) in `docker-compose.yml`?
 * **Containers are Stateless & Ephemeral**: When a Docker container stops or is recreated (`docker compose down`), all files written inside its internal layer are wiped out.
 * **Named Volumes**: Docker provisions a dedicated storage area on the host machine managed by Docker. Even if the container is destroyed or upgraded to a new Postgres image version, the database data in `postgres_data` persists intact.
+
+### Q39: What is Database Indexing, how does a B-Tree work under the hood, and why shouldn't you index every column?
+* **What is an Index? (The Book Analogy)**:
+  * Without an index, finding a row in a 10,000,000-row table requires a **Full Table Scan ($O(N)$)**: reading every disk block sequentially.
+  * An index is a separate, ordered data structure (like the alphabetical index at the back of a book) that points directly to the physical storage address (Tuple ID) of the row.
+* **How a B-Tree Index Works ($O(\log N)$)**:
+  * A B-Tree organizes keys in a balanced tree hierarchy. Looking up a key in a 10,000,000-row table requires only **3 to 4 pointer traversals** through root and branch nodes to reach the leaf node, resolving in **< 1 millisecond**.
+* **The Cost & Trade-offs of Indexing**:
+  * **Write Degradation**: Every `INSERT`, `UPDATE`, and `DELETE` must not only modify the table heap, but also update and rebalance all B-Trees attached to that table.
+  * **Memory & Storage Overhead**: Indexes take up disk space and must fit inside the database's RAM buffer pool to remain fast.
+* **When to Index in CampusHub**:
+  * **Foreign Keys**: `clubId` in `Event`, `authorId` in `Post` (accelerates `JOIN`s).
+  * **Unique Identifiers**: `email` in `User`, `slug` in `Club` (accelerates lookups).
+  * **Filter & Sort Columns**: `startTime` in `Event`, `createdAt` in `Post` (accelerates `WHERE` and `ORDER BY` queries).
