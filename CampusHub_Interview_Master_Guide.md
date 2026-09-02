@@ -259,3 +259,23 @@
 * **1. The N+1 Query Problem**: Executing database queries in a loop rather than using `include`, `select`, or batching (`WHERE id IN (...)`).
 * **2. Complex Analytical Queries**: For large-scale reporting with window functions, recursive CTEs, or geospatial calculations, ORMs can generate heavy SQL. *(Prisma provides `prisma.$queryRaw` for writing optimized raw SQL when needed)*.
 * **3. Memory Overhead**: Mapping thousands of database rows into JavaScript objects consumes more memory than streaming raw byte buffers.
+
+### Q35: Why choose PostgreSQL over MongoDB for a college platform like CampusHub?
+* **Relational Domain Modeling**: CampusHub consists of heavily interconnected Many-to-Many associations (Users to Clubs, Users to Events, Clubs to Events). In MongoDB, Many-to-Many requires either data duplication (embedding) leading to data inconsistency, or slow manual `$lookup` joins without foreign key guarantees.
+* **Referential Integrity**: PostgreSQL enforces Foreign Keys with `ON DELETE CASCADE` and `RESTRICT` at the engine level, preventing orphan records.
+* **Concurrency & Race Conditions**: Registering for an event with limited capacity requires row-level locking (`SELECT FOR UPDATE`) or atomic conditional updates, which PostgreSQL handles natively.
+* **`JSONB` Support**: PostgreSQL supports `JSONB` with GIN indexing, giving document-store flexibility for unstructured data when needed.
+
+### Q36: What are the key advantages of PostgreSQL over MySQL?
+* **1. Transactional DDL**: In PostgreSQL, schema migrations (`ALTER TABLE`, `CREATE TABLE`) run inside transactions. If step 4 of a 5-step migration fails, the entire migration rolls back cleanly. In MySQL, DDL statements trigger an implicit commit; failures leave the database in a broken half-migrated state.
+* **2. Advanced Indexing Engines**: PostgreSQL provides 6 native index types: **B-Tree**, **GIN** (for JSONB/arrays), **GiST** (ranges/geometry), **BRIN** (ultra-compact for massive time-series), **Hash**, and **SP-GiST**. MySQL primarily relies on standard B-Trees.
+* **3. Partial (Filtered) Indexes**: PostgreSQL supports `CREATE INDEX idx ON users(email) WHERE is_active = true`, indexing only matching rows to save up to 95% disk space and RAM. MySQL does not support partial indexes.
+* **4. Extensibility**: Extensions like `pgvector` (Vector database for AI embeddings), `PostGIS` (Geospatial standard), and `pg_trgm` (Fuzzy text search).
+
+### Q37: What is the architectural difference between PostgreSQL's Process model and MySQL's Thread model?
+* **PostgreSQL (Process-Per-Connection)**: Spawns an isolated OS process for each client. Offers complete memory isolation (a crashed query in one connection cannot crash the server), but uses ~5–10MB memory per connection, making connection pooling (PgBouncer/Prisma) best practice.
+* **MySQL (Thread-Per-Connection)**: Uses threads inside a single shared OS process. Cheaper connection creation, but memory crashes can impact the whole server.
+
+### Q38: Why do we use Named Volumes (`postgres_data:/var/lib/postgresql/data`) in `docker-compose.yml`?
+* **Containers are Stateless & Ephemeral**: When a Docker container stops or is recreated (`docker compose down`), all files written inside its internal layer are wiped out.
+* **Named Volumes**: Docker provisions a dedicated storage area on the host machine managed by Docker. Even if the container is destroyed or upgraded to a new Postgres image version, the database data in `postgres_data` persists intact.

@@ -1,0 +1,45 @@
+services:
+  # ========================================================
+  # 1. PostgreSQL 16 (Relational Database)
+  # ========================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: campushub_postgres
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: campushub_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d campushub_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ========================================================
+  # 2. Redis 7 (In-Memory Cache & Background Job Queue)
+  # ========================================================
+  redis:
+    image: redis:7-alpine
+    container_name: campushub_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# ========================================================
+# Named Volumes (Guarantees data persists across restarts)
+# ========================================================
+volumes:
+  postgres_data:
+  redis_data:
