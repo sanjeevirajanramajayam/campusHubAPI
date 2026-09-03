@@ -792,3 +792,35 @@
 * **Payload Fingerprinting (Tampering Guard)**:
   * To prevent attackers from reusing an `Idempotency-Key` for a completely different request, the server computes a SHA-256 hash of `Method + URL + Body` and stores it alongside the key.
   * If an incoming key matches but the payload hash differs, the server rejects the request with `422 Unprocessable Entity` (`"Idempotency key payload mismatch"`).
+
+### Q76: Why must an Idempotency Middleware store the `statusCode` and `body` in Redis? (The "Transparent Replay" Principle)
+* **The "Time Machine" Contract (RFC 9440)**:
+  * An idempotent retry must be completely indistinguishable to the client from the original request.
+* **Why `isDone: true` is an Anti-Pattern**:
+  * If the backend only stores a boolean flag, retried requests cannot reconstruct the created resource (e.g. `club.id` or `ticketNumber`).
+  * If the server returns `{ success: true }` or throws `"Already created"`, client-side state machines and UI navigation crash because expected payload properties are `undefined`.
+* **Preserving HTTP Semantics**:
+  * Different endpoints produce different status codes: `201 Created` for resource creation, `200 OK` for updates, or `400 Bad Request` for business rejections. Storing `statusCode` alongside `body` ensures client SDKs receive the exact same status and envelope without executing any server-side database logic.
+
+### Q77: What is "Monkey-Patching" in JavaScript, and how did we use it to intercept `res.send` for idempotency caching?
+* **Definition**:
+  * Dynamically modifying or extending the runtime behavior of an existing object's method on-the-fly without altering the original library's source code.
+* **The Express Middleware Lifecycle Problem**:
+  * Middlewares execute *before* route handlers. However, caching the HTTP response in Redis requires capturing the data *after* the controller finishes executing.
+* **The `res.send` Interception Technique**:
+  1. Capture a reference to Express's native function: `const originalSend = res.send.bind(res);`.
+  2. Overwrite `res.send` with a custom wrapper function.
+  3. Inside the wrapper: capture `res.statusCode` and the serialized JSON `body`.
+  4. Non-blockingly persist the data into Redis with an explicit TTL.
+  5. Invoke `originalSend(body)` so the raw bytes are transmitted across the network socket to the client normally.
+
+### Q78: What is Cursor-Based Pagination vs. Offset-Based Pagination, and why is `OFFSET 100000` a database performance trap?
+* **The $O(N)$ Disk Scan Trap of Offset Pagination (`OFFSET 100000 LIMIT 20`)**:
+  * PostgreSQL cannot jump to row 100,000. It must sequentially scan the first 100,000 rows from disk, discard them into memory trash, and return only rows 100,001–100,020.
+  * Query execution degrades from 2ms on page 1 to 3,000ms+ on deep pages, consuming excessive database disk I/O and buffer cache.
+* **The "Drift / Duplicate Items" Bug**:
+  * In live social feeds, if a new post is inserted while a user navigates between page 1 and page 2, rows shift downwards. The user sees the last post of page 1 duplicated at the top of page 2. If a post is deleted, a row is skipped entirely.
+* **Cursor-Based (Keyset) Pagination (`WHERE id < :cursor LIMIT 20`)**:
+  * Instead of skipping rows, the client asks for rows created *after the last seen record*.
+  * PostgreSQL leverages the composite B-Tree index on `(createdAt, id)` to jump directly to the target row in $\mathcal{O}(\log N)$ page reads (< 1ms), regardless of how deep the user scrolls.
+  * Immune to feed drift: live insertions or deletions do not cause duplicate or missing records.
