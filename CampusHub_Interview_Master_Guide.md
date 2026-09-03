@@ -502,3 +502,18 @@
   * **Transport Independence**: You can add a WebSocket gateway, GraphQL API, or CLI script tomorrow by reusing 100% of your existing Services and Repositories.
   * **Database Portability**: Swapping PostgreSQL for MongoDB or Redis only requires changing the Repository; your core business rules (Services) remain untouched.
   * **Effortless Testing**: Services can be unit tested in milliseconds using in-memory mock repositories without spinning up databases.
+
+### Q55: What does `app.use(express.urlencoded({ extended: true, limit: '1mb' }))` do, and why do HTML form submissions still exist when SPAs use JSON?
+* **1. What is `application/x-www-form-urlencoded`?**:
+  * Standard format used by native HTML forms. Encodes key-value pairs separated by `&` and percent-encodes special characters (e.g., `email=student%40campus.edu&password=123`).
+  * Without this middleware, Express ignores form payloads, leaving `req.body` as `undefined`.
+* **2. `extended: true` vs `extended: false`**:
+  * **`extended: false`**: Uses Node.js's built-in `querystring` parser. Cannot parse nested objects; keys like `user[name]=Alex` remain flat strings.
+  * **`extended: true`**: Uses the `qs` library. Allows rich, deeply nested objects and arrays (`{ user: { name: 'Alex' } }`).
+* **3. The `limit: '1mb'` Security Guard**:
+  * Defends against **Denial of Service (DoS) memory exhaustion attacks**. If an attacker streams a 1GB payload to crash the Node process, Express terminates the TCP connection and returns `413 Payload Too Large` once the body exceeds 1MB.
+* **4. Why Form Submissions Still Exist in Modern Backends**:
+  * **OAuth 2.0 / OpenID Connect Standards**: RFC 6749 strictly mandates that authorization code token exchanges (`POST /oauth/token`) must be sent as `application/x-www-form-urlencoded`.
+  * **Payment Gateway Redirects**: Banks and payment processors (PayPal, Stripe, PayU) redirect users back to your server via native HTML form POSTs.
+  * **External Webhooks**: Many third-party communication providers (like Twilio SMS webhooks) send alerts formatted as urlencoded data.
+  * **Progressive Enhancement**: HTML forms function natively even if client-side JavaScript bundles fail to load on poor mobile networks.
