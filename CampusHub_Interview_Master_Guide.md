@@ -489,3 +489,16 @@
   * Centralizing validation in a reusable middleware ensures that all 50+ endpoints across the application return the exact same, predictable error JSON structure on invalid input.
 * **4. Mutation & Sanitization at the Boundary**:
   * Zod schemas don't just validate; they transform data (e.g. `.trim()`, `.toLowerCase()`). The middleware mutates `req.body` with sanitized values before downstream handlers receive it, guaranteeing clean data reaches domain services.
+
+### Q54: Explain the Controller-Service-Repository Architecture and what distinguishes a "Business Rule" from "Input Validation"?
+* **The Restaurant Analogy (Layer Responsibilities)**:
+  * **1. The Waiter (Controller)**: Speaks the HTTP protocol. Unpacks request bodies, query params, and headers; delegates work to the Service; and sets HTTP cookies and status codes (`200 OK`, `201 Created`). Contains zero business rules or database queries.
+  * **2. The Head Chef (Service / Business Logic)**: The brain of the application. Enforces university domain policies, permissions, calculations, and coordinates workflows (e.g. verifying password hashes, checking event capacities, initiating payments). Never imports Express (`req`, `res`).
+  * **3. The Pantry Keeper (Repository)**: Encapsulates direct database persistence (Prisma / SQL queries). Blindly stores and retrieves data without understanding or caring about business policies.
+* **Input Validation vs. Business Rules**:
+  * **Input Validation (Middleware / Zod)**: Checks *syntax and shape* from the payload alone without database context (e.g., "Is `email` formatted with an `@` symbol?", "Is `password` >= 8 characters?").
+  * **Business Rules (Service Layer)**: Enforces domain policies requiring *state, authorization, time, or external checks* (e.g., "Is this email already registered?", "Does this password match the Argon2 hash?", "Is the student banned?", "Is this event at full capacity?").
+* **Why Industry Standards Require This Separation**:
+  * **Transport Independence**: You can add a WebSocket gateway, GraphQL API, or CLI script tomorrow by reusing 100% of your existing Services and Repositories.
+  * **Database Portability**: Swapping PostgreSQL for MongoDB or Redis only requires changing the Repository; your core business rules (Services) remain untouched.
+  * **Effortless Testing**: Services can be unit tested in milliseconds using in-memory mock repositories without spinning up databases.
