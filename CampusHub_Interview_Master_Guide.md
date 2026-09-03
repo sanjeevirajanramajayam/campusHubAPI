@@ -479,3 +479,13 @@
   * **Singleton**: Created once when the app boots and shared across all requests (e.g. `PrismaClient`, `Redis`).
   * **Transient**: A fresh instance is created every time it is injected.
   * **Scoped / Request-Scoped**: Created once per incoming HTTP request and destroyed after `res.send()` (e.g. `RequestContext`, multi-tenant DB transactions).
+
+### Q53: Why perform request validation in Middleware instead of inside the Controller or Service?
+* **1. Fail-Fast Security & Resource Protection**:
+  * If a malicious bot attacks with 10,000 invalid requests per second, a validation middleware (`validate(schema)`) rejects them at the network edge in < 0.1ms. Controllers and services never allocate memory or execute CPU cycles on malformed payloads.
+* **2. Single Responsibility Principle (SRP)**:
+  * A controller's only responsibility is HTTP orchestration (extracting body/headers, invoking domain services, and returning HTTP status codes and cookies). Manually writing 20 lines of `if (!req.body.email)` checks bloats the controller and violates SRP.
+* **3. DRY (Don't Repeat Yourself) & API Consistency**:
+  * Centralizing validation in a reusable middleware ensures that all 50+ endpoints across the application return the exact same, predictable error JSON structure on invalid input.
+* **4. Mutation & Sanitization at the Boundary**:
+  * Zod schemas don't just validate; they transform data (e.g. `.trim()`, `.toLowerCase()`). The middleware mutates `req.body` with sanitized values before downstream handlers receive it, guaranteeing clean data reaches domain services.
