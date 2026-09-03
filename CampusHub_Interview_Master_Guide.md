@@ -728,3 +728,46 @@
   * Generates an optimal single SQL query:  
     `DELETE FROM "club_members" WHERE "user_id" = $1 AND "club_id" = $2;`
   * Resolves directly via the B-Tree index in $\mathcal{O}(1)$ without needing the row's surrogate primary key ID, ensuring strict atomicity and zero table scans.
+
+### Q74: Deep Dive into Session Invalidation: Redis Token Blacklisting vs. Traditional DB Sessions vs. The `tokenVersion` Pattern.
+* **The Problem: The "Stateless JWT Paradox"**:
+  * Standard JWT Access Tokens are purely stateless. When a user clicks "Logout", their 15-minute token remains mathematically valid in memory. If someone intercepts it, they can make authenticated requests until the `exp` timestamp elapses.
+* **1. Strategy A: Traditional Database Sessions (Old-School Stateful Auth)**:
+  * *How it works*: On login, the server generates a random 32-byte opaque session ID (e.g. `sess_abc123`), stores it in a SQL table (`sessions (id, user_id, data, expires_at)`), and sets it as a cookie.
+  * *The Workflow*: On **every single HTTP request**, Express queries:  
+    `SELECT * FROM sessions WHERE id = 'sess_abc123' AND expires_at > NOW();`
+  * *Instant Invalidation*: Calling `/logout` runs `DELETE FROM sessions WHERE id = 'sess_abc123'`. The session is immediately dead!
+  * *The Fatal Flaw at Scale*:
+    1. **Heavy Database IOPS Penalty**: 50,000 active students browsing an app generates **50,000 database reads every second** just to verify user identity before any business logic can run!
+    2. **Horizontal Scaling Bottleneck**: If sessions are stored in local server RAM, sticky sessions are required. If stored in a centralized SQL database, the database connection pool becomes the primary point of failure.
+* **2. Strategy B: Redis Token Blacklisting (Our Implementation - Hybrid Exception Model)**:
+  * *The Core Philosophy*: Don't verify that every user is valid; only check for the rare **exceptions** who explicitly logged out!
+  * *How it works*:
+    1. Standard JWTs are trusted by default via CPU cryptography (`jwt.verify()`).
+    2. On `POST /auth/logout`, the server extracts the Access Token from `Authorization: Bearer <token>`.
+    3. It reads the token's `exp` claim and calculates the remaining lifespan: `ttlSeconds = exp - now`.
+    4. It writes a SHA-256 hash of the token to Redis: `SET bl:<hash> "revoked" EX <ttlSeconds>`.
+    5. In the `authenticate` middleware, the server checks `redis.exists(bl:<hash>)`.
+  * *Why SHA-256 Key Hashing*: A raw JWT is 300–500 bytes long. A SHA-256 hex digest is always exactly 64 characters. Hashing saves 80% RAM in Redis and speeds up key lookup.
+  * *The Self-Cleaning Secret (Zero Memory Leaks)*: Because the Redis key has an exact TTL matching the token's remaining minutes, the key automatically disappears from RAM the moment the token expires naturally. The blacklist only contains tokens of users who logged out in the last 15 minutes (~20 keys for 50k users)!
+  * *Performance*: `redis.exists` executes an in-memory hash lookup in **0.1 to 0.3 milliseconds**, adding negligible latency.
+* **3. Strategy C: The `tokenVersion` Pattern (Password Reset & Global Multi-Device Logout)**:
+  * *How it works*:
+    1. Add an integer column to the `User` table: `tokenVersion Int @default(1)`.
+    2. Encode the current version in the JWT payload: `{ userId: "123", tokenVersion: 1 }`.
+    3. When a user clicks **"Log out of all devices"** or **"Change Password"**, execute:  
+       `UPDATE users SET token_version = token_version + 1 WHERE id = $userId;`  
+       The user's version is now `2`.
+    4. On subsequent requests, if `token.tokenVersion < user.tokenVersion`, the token is rejected!
+  * *Comparison*:
+    * Blacklist is ideal for **single-device logout** (kills only the token on this browser).
+    * `tokenVersion` is ideal for **global security events** (killing 5 active sessions across phones, tablets, and laptops in a single database update).
+* **Summary Trade-off Matrix**:
+
+| Dimension | Traditional DB Sessions | Redis Token Blacklist | `tokenVersion` Pattern |
+|---|---|---|---|
+| **Request Latency** | 5–15ms (Disk SQL query) | **0.2ms (In-memory RAM)** | 0ms (if cached) or SQL lookup |
+| **Database Load** | 100% of requests hit DB | **0% hit SQL DB** (Redis only) | Requires user version check |
+| **Instant Invalidation?** | Yes | **Yes (Immediate)** | **Yes (Global to all devices)** |
+| **Storage Growth** | High (Table bloat without cron) | **Zero (Self-evicting TTL)** | Negligible (1 integer per user) |
+| **Target Use Case** | Legacy monolithic apps | **Modern microservices & REST APIs** | **Password reset / Ban user** |
