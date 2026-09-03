@@ -824,3 +824,17 @@
   * Instead of skipping rows, the client asks for rows created *after the last seen record*.
   * PostgreSQL leverages the composite B-Tree index on `(createdAt, id)` to jump directly to the target row in $\mathcal{O}(\log N)$ page reads (< 1ms), regardless of how deep the user scrolls.
   * Immune to feed drift: live insertions or deletions do not cause duplicate or missing records.
+
+### Q79: What does `.bind()` mean in JavaScript, and why was `res.send.bind(res)` mandatory in our Idempotency Middleware?
+* **The "Lost `this`" Execution Context Trap**:
+  * In JavaScript, the value of `this` is dynamic and determined by *how* a function is called, not where it is defined.
+  * When an object method is extracted into a standalone variable (e.g. `const originalSend = res.send;`), its reference to `res` is severed. Calling `originalSend(body)` executes with `this === undefined` (in strict mode).
+* **The Express Internal Socket Dependency**:
+  * Express's `res.send` is not a pure function. Under the hood, it accesses internal HTTP socket properties via `this` (e.g. `this.setHeader()`, `this.headersSent`, and `this.end()`).
+  * If invoked without `this` bound to `res`, Express crashes with `TypeError: Cannot read properties of undefined (reading 'setHeader')`.
+* **The Role of `.bind()`**:
+  * `Function.prototype.bind(context)` returns a new bound function where `this` is permanently locked to the specified object (`res`), regardless of how or where it is later invoked.
+* **Comparison: `.bind()` vs. `.call()` vs. `.apply()`**:
+  * **`.bind(obj)`**: Returns a new function with `this` permanently glued to `obj` to be called later.
+  * **`.call(obj, arg1, arg2)`**: Executes the function immediately with `this = obj` and comma-separated arguments.
+  * **`.apply(obj, [arg1, arg2])`**: Executes the function immediately with `this = obj` and arguments passed as an Array.
