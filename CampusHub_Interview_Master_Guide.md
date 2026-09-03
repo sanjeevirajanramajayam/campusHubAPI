@@ -956,3 +956,42 @@
   1. **Randomized Test Execution (`--shuffle`)**: Uncovers tests that secretly rely on database state left behind by an earlier test.
   2. **Automated Quarantine**: Isolates erratic tests into a non-blocking diagnostic suite until patched.
   3. **Deterministic Mocking**: Replacing external network requests with recorded in-memory fixtures to eliminate environmental variability.
+
+### Q92: What are Branch Protection Rules and Environment Gates in CI/CD?
+* **Branch Protection Guards**:
+  * Enforces that no engineer (including repository owners) can push directly to `main`.
+  * Every mutation must pass through a Pull Request where:
+    1. Mandatory CI status checks (`quality-check`, `docker-build`) pass with Exit Code 0.
+    2. Minimum peer approvals (e.g. 2 senior reviews) are satisfied.
+    3. Merging is restricted to linear history (Squash or Rebase) to prevent chaotic multi-parent commit graphs.
+* **Environment Gates (Staging vs. Production)**:
+  * Merges to `main` automatically deploy to an internal Staging environment where automated end-to-end smoke tests run.
+  * Production deployments are gated by **GitHub Environment Protection Rules**, requiring explicit manual sign-off from designated Tech Leads before production traffic is rerouted.
+
+### Q93: How does Automated Semantic Versioning work with Conventional Commits?
+* **Semantic Versioning Specification (SemVer: `MAJOR.MINOR.PATCH`)**:
+  * **PATCH (`1.0.0 -> 1.0.1`)**: Backward-compatible bug fixes and security patches.
+  * **MINOR (`1.0.0 -> 1.1.0`)**: Backward-compatible feature additions.
+  * **MAJOR (`1.0.0 -> 2.0.0`)**: Breaking contract modifications (e.g. payload schema changes).
+* **Automated CI Engine (`semantic-release`)**:
+  * Inspects commit headers using the Conventional Commits specification:
+    * `fix:` -> bumps PATCH.
+    * `feat:` -> bumps MINOR.
+    * `feat!:` or `BREAKING CHANGE:` -> bumps MAJOR.
+  * Eliminates human version management by automatically calculating the next SemVer tag, appending release notes to `CHANGELOG.md`, tagging the Git commit, and publishing versioned container tags (`campushub:v1.2.0`).
+
+### Q94: What are Ephemeral PR Preview Environments ("Review Apps")?
+* **The Problem**:
+  * Reviewing code diffs on GitHub is insufficient for UI/UX verification, while maintaining 10 permanent staging servers for 10 concurrent feature branches is cost-prohibitive.
+* **The Ephemeral Architecture**:
+  * When a PR is opened, the CI pipeline provisions a lightweight, temporary isolated container on cloud infrastructure (e.g. `https://pr-42.campushub.onrender.com`) accompanied by a temporary database branch (via Neon or Supabase branching).
+  * Product managers, QA, and mobile developers test against the live running URL directly from the PR.
+  * The moment the PR is merged or closed, GitHub Actions webhooks destroy the container and drop the database branch, reducing cloud compute costs to zero when idle.
+
+### Q95: How do Code Coverage Enforcers (Codecov / Vitest) prevent technical debt in CI?
+* **Coverage Metrics**:
+  * **Line Coverage**: % of lines executed during tests.
+  * **Branch Coverage**: Validates that both conditions of branching logic (`if / else`, ternary operators, try/catch blocks) were triggered.
+* **CI Quality Gate**:
+  * During the test run, tools like Vitest or Jest output an `lcov.info` report.
+  * Automated bots (like Codecov) analyze the diff: if a pull request introduces new business logic without corresponding tests, or if overall repo coverage drops below a defined threshold (e.g. 80%), the status check fails (❌), blocking the pull request from merging.
