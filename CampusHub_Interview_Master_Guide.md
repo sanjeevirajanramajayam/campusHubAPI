@@ -715,3 +715,16 @@
 * **Slug Collision Handling**:
   * Because database schemas require slugs to be unique (`slug String @unique`), duplicate club names (e.g. two "Chess Club" entries) trigger unique constraint failures.
   * **Production Resolution**: The service layer checks `findBySlug()`. If a collision exists, it automatically appends an incremental counter or short unique suffix (e.g. `chess-club-1`, `chess-club-2`) before persisting.
+
+### Q73: What is a Compound Unique Constraint, and how does Prisma generate `userId_clubId` for $O(1)$ lookups?
+* **The Naive Junior Anti-Pattern**:
+  * Querying a table by non-unique fields (`findFirst({ where: { userId, clubId } })`) to retrieve a surrogate ID, followed by a second query (`delete({ where: { id } })`).
+  * *Disadvantages*: Causes two network round-trips to PostgreSQL, triggers unindexed table scans, and opens a race condition hazard between the read and write.
+* **Compound Unique Constraint (`@@unique([userId, clubId])`)**:
+  * Declares that the tuple combination of `(user_id, club_id)` must be globally unique across the table (a user cannot join the same club twice).
+  * PostgreSQL automatically creates a **Composite B-Tree Index** across both columns on disk.
+* **Prisma's Synthesized Compound Accessor (`userId_clubId`)**:
+  * Because Prisma requires a strictly unique selector for `.delete()` and `.update()`, it joins the compound column names with an underscore: `userId_clubId`.
+  * Generates an optimal single SQL query:  
+    `DELETE FROM "club_members" WHERE "user_id" = $1 AND "club_id" = $2;`
+  * Resolves directly via the B-Tree index in $\mathcal{O}(1)$ without needing the row's surrogate primary key ID, ensuring strict atomicity and zero table scans.
