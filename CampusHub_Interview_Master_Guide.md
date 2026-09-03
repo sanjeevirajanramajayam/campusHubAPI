@@ -589,3 +589,20 @@
   * **Lower CPU Overhead**: JWS signing/verification is much faster than AES/RSA decryption.
   * **Compact Size**: JWE payloads are significantly larger, consuming more network bandwidth on every HTTP request.
   * **Client Inspection**: Frontend UI often legitimately needs to inspect claims (like `role` or `userName`) without an extra round-trip API call.
+
+### Q62: How does `next(err)` internally trigger the `errorHandler` in Express?
+* **The Internal Router Stack**:
+  * Express stores all middlewares in an array (`router.stack`). When registered with 4 arguments (`fn.length === 4`), Express sets `layer.isErrorHandler = true`.
+* **The Dual-Rail Mechanism**:
+  * Normal `next()` advances to the next layer where `isErrorHandler === false`.
+  * Passing any argument to `next(err)` switches Express to the **Error Rail**: Express's internal loop immediately skips all remaining normal route handlers and middlewares until it finds a layer with `isErrorHandler === true`, invoking `errorHandler(err, req, res, next)`.
+
+### Q63: Why is a Centralized `errorHandler` Middleware mandatory in production backends?
+* **1. Process Crash Prevention (Uncaught Exceptions)**:
+  * Unhandled synchronous errors in Node.js emit `uncaughtException` and kill the entire OS process, terminating connections for all connected users. A global error handler safely catches errors, keeps the Node process alive, and returns a graceful HTTP `500`.
+* **2. Preventing Security Information Leaks**:
+  * Database driver crashes (e.g. Prisma / PostgreSQL syntax or constraint errors) contain raw SQL queries, table names, and column types. In production, `errorHandler` sanitizes the response, preventing database schema leakage to attackers while keeping full stack traces in private Pino logs.
+* **3. Enforcing a Predictable Error Contract**:
+  * Guarantees every single endpoint returns an identical JSON envelope (`{ success: false, error: { code, message, details } }`), eliminating client-side error parsing inconsistencies.
+* **4. DRY (Eliminating 1,000 Lines of Boilerplate)**:
+  * Controllers avoid repetitive 15-line `try/catch` and HTTP status mapping logic, simply delegating uncaught errors to the central safety net.
