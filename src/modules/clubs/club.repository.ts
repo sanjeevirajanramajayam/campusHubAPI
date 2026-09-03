@@ -1,6 +1,10 @@
 import type { Club, ClubMember, ClubRole } from '@prisma/client';
 import { prisma } from '../../infrastructure/prisma/client.js';
-import type { IClubRepository, CreateClubDTO, ClubWithMemberCount } from './club.repository.interface.js';
+import type {
+  IClubRepository,
+  CreateClubDTO,
+  ClubWithMemberCount,
+} from './club.repository.interface.js';
 
 export class PrismaClubRepository implements IClubRepository {
   async createWithAdmin(data: CreateClubDTO): Promise<Club> {
@@ -62,7 +66,10 @@ export class PrismaClubRepository implements IClubRepository {
     });
   }
 
-  async update(id: string, data: Partial<Pick<CreateClubDTO, 'name' | 'description' | 'bannerUrl'>>): Promise<Club> {
+  async update(
+    id: string,
+    data: Partial<Pick<CreateClubDTO, 'name' | 'description' | 'bannerUrl'>>,
+  ): Promise<Club> {
     return prisma.club.update({
       where: { id },
       data,

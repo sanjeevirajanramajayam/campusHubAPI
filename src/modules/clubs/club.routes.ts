@@ -8,7 +8,7 @@ import { createClubSchema } from './club.dto.js';
 
 /**
  * Creates and configures the Express Club Router
- * 
+ *
  * Composition Root for the Club Module:
  * Instantiates PrismaClubRepository -> ClubService -> ClubController
  */

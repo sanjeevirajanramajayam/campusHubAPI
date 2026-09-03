@@ -4,7 +4,7 @@ import type { IUserRepository, CreateUserDTO } from './user.repository.interface
 
 /**
  * Prisma Implementation of IUserRepository
- * 
+ *
  * WHY:
  * 1. Encapsulates all direct Prisma queries relating to the `User` model.
  * 2. Implements the IUserRepository contract, allowing it to be swapped or mocked.

@@ -11,11 +11,11 @@ interface IdempotencyRecord {
 }
 
 const DEFAULT_TTL_SECONDS = 86400; // 24 Hours
-const LOCK_TTL_SECONDS = 120;       // 2 Minutes (in-flight timeout)
+const LOCK_TTL_SECONDS = 120; // 2 Minutes (in-flight timeout)
 
 /**
  * Reusable Idempotency Middleware (RFC 9440 & Stripe Specification)
- * 
+ *
  * WHY:
  * 1. Prevents duplicate state mutations (e.g. double charging, duplicate registrations)
  *    when network drops cause clients to retry requests.
@@ -54,14 +54,14 @@ export const idempotency = (ttlSeconds = DEFAULT_TTL_SECONDS) => {
         // Tampering Guard: Payload must match previous request
         if (record.fingerprint !== requestFingerprint) {
           throw new UnprocessableEntityError(
-            'Idempotency key was previously used with a different request payload'
+            'Idempotency key was previously used with a different request payload',
           );
         }
 
         // Concurrency Guard: Request still in flight
         if (record.status === 'PROCESSING') {
           throw new ConflictError(
-            'A request with this idempotency key is currently being processed. Please wait.'
+            'A request with this idempotency key is currently being processed. Please wait.',
           );
         }
 
@@ -80,12 +80,12 @@ export const idempotency = (ttlSeconds = DEFAULT_TTL_SECONDS) => {
         }),
         'EX',
         LOCK_TTL_SECONDS,
-        'NX'
+        'NX',
       );
 
       if (!lockAcquired) {
         throw new ConflictError(
-          'A concurrent request with this idempotency key is already running.'
+          'A concurrent request with this idempotency key is already running.',
         );
       }
 

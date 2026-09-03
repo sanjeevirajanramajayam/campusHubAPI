@@ -2,20 +2,23 @@ import type { Club, ClubMember } from '@prisma/client';
 import type { IClubRepository, ClubWithMemberCount } from './club.repository.interface.js';
 import { PrismaClubRepository } from './club.repository.js';
 import type { CreateClubInput, UpdateClubInput } from './club.dto.js';
-import { ConflictError, NotFoundError, BadRequestError, ForbiddenError } from '../../common/errors/app-error.js';
+import {
+  ConflictError,
+  NotFoundError,
+  BadRequestError,
+  ForbiddenError,
+} from '../../common/errors/app-error.js';
 
 /**
  * Club Domain Service
- * 
+ *
  * WHY:
  * 1. Constructor Dependency Injection allows unit testing without PostgreSQL.
  * 2. Enforces business rules: slug uniqueness, member duplicates, preventing
  *    abandonment of clubs by the sole administrator.
  */
 export class ClubService {
-  constructor(
-    private readonly clubRepo: IClubRepository = new PrismaClubRepository()
-  ) {}
+  constructor(private readonly clubRepo: IClubRepository = new PrismaClubRepository()) {}
 
   /**
    * Transforms a human-readable club name into a URL-safe slug
@@ -25,8 +28,8 @@ export class ClubService {
       .toLowerCase()
       .trim()
       .replace(/[^\w\s-]/g, '') // strip special characters
-      .replace(/[\s_-]+/g, '-')  // replace spaces and underscores with a single hyphen
-      .replace(/^-+|-+$/g, '');  // strip leading and trailing hyphens
+      .replace(/[\s_-]+/g, '-') // replace spaces and underscores with a single hyphen
+      .replace(/^-+|-+$/g, ''); // strip leading and trailing hyphens
   }
 
   /**
@@ -101,7 +104,9 @@ export class ClubService {
 
     // Business Rule: Club Admin cannot abandon the club without transferring ownership
     if (membership.role === 'ADMIN') {
-      throw new BadRequestError('As the club administrator, you must transfer ownership before leaving');
+      throw new BadRequestError(
+        'As the club administrator, you must transfer ownership before leaving',
+      );
     }
 
     await this.clubRepo.removeMember(clubId, userId);

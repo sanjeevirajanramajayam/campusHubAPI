@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * Zod Validation Schemas and DTO Types for Clubs
- * 
+ *
  * WHY:
  * 1. Strict input validation prevents over-posting attacks and malformed data.
  * 2. Inferred TypeScript types guarantee end-to-end type safety between controllers and services.

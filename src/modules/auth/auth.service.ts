@@ -2,7 +2,10 @@ import { randomUUID, createHash } from 'crypto';
 import type { IUserRepository } from '../users/user.repository.interface.js';
 import type { IRefreshTokenRepository } from './refresh-token.repository.interface.js';
 import { PrismaRefreshTokenRepository } from './refresh-token.repository.js';
-import { PasswordService, passwordService as defaultPasswordService } from '../../common/security/password.service.js';
+import {
+  PasswordService,
+  passwordService as defaultPasswordService,
+} from '../../common/security/password.service.js';
 import { JwtService, jwtService as defaultJwtService } from '../../common/security/jwt.service.js';
 import { ConflictError, UnauthorizedError, NotFoundError } from '../../common/errors/app-error.js';
 import type { RegisterInput, LoginInput } from './auth.dto.js';
@@ -22,7 +25,7 @@ export interface AuthResult {
 
 /**
  * Authentication Business Logic Service with Token Family Rotation
- * 
+ *
  * WHY:
  * 1. Constructor Dependency Injection for IUserRepository and IRefreshTokenRepository.
  * 2. Implements Refresh Token Rotation (RTR): tokens are single-use only.
@@ -34,7 +37,7 @@ export class AuthService {
     private readonly userRepo: IUserRepository,
     private readonly refreshTokenRepo: IRefreshTokenRepository = new PrismaRefreshTokenRepository(),
     private readonly passwordService: PasswordService = defaultPasswordService,
-    private readonly jwtService: JwtService = defaultJwtService
+    private readonly jwtService: JwtService = defaultJwtService,
   ) {}
 
   private sanitizeUser(user: User): UserWithoutPassword {

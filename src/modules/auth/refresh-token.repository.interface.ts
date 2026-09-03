@@ -9,7 +9,7 @@ export interface CreateRefreshTokenDTO {
 
 /**
  * Refresh Token Repository Interface (Contract)
- * 
+ *
  * WHY:
  * 1. Encapsulates session persistence for Token Family Rotation.
  * 2. Provides atomic family revocation when token reuse/theft is detected.

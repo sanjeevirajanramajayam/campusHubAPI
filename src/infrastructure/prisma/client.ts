@@ -4,7 +4,7 @@ import { logger } from '../../common/logger.js';
 
 /**
  * Singleton Prisma Client Instance
- * 
+ *
  * WHY A SINGLETON?
  * 1. Calling `new PrismaClient()` creates a fresh database connection pool (10 connections).
  * 2. Creating multiple instances across files or during development hot-reloads (`tsx watch`)
@@ -39,7 +39,7 @@ if (env.NODE_ENV === 'development') {
         params: e.params,
         durationMs: e.duration,
       },
-      'Prisma SQL Query Executed'
+      'Prisma SQL Query Executed',
     );
   });
 

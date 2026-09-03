@@ -4,7 +4,7 @@ import { ValidationError } from '../common/errors/app-error.js';
 
 /**
  * Reusable Zod Validation Middleware
- * 
+ *
  * WHY:
  * 1. Guarantees controllers receive clean, verified, and typed payloads.
  * 2. Catches malformed user input at the HTTP boundary before it reaches domain services.

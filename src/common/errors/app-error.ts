@@ -1,6 +1,6 @@
 /**
  * Base Application Error
- * 
+ *
  * WHY:
  * Extends the native `Error` class and adds standard properties:
  * - `statusCode`: HTTP status code (e.g. 400, 401, 403, 404, 500)
@@ -66,4 +66,3 @@ export class UnprocessableEntityError extends AppError {
     super(message, 422, code, details);
   }
 }
-

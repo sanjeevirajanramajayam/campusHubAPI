@@ -23,7 +23,7 @@ export interface RefreshTokenPayload {
 
 /**
  * JWT Security Service
- * 
+ *
  * WHY:
  * 1. Encapsulates token signing, verification, and expiration parameters.
  * 2. Isolates cryptographic JWT errors into friendly domain AppError (UnauthorizedError).

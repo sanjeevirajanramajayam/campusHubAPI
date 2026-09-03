@@ -16,7 +16,7 @@ export interface CreateUserDTO {
 
 /**
  * User Repository Interface (The Contract)
- * 
+ *
  * WHY:
  * 1. High-level services (AuthService, UserService) depend on this interface,
  *    adhering strictly to the Dependency Inversion Principle (D of SOLID).

@@ -13,7 +13,7 @@ const server = app.listen(env.PORT, () => {
 
 /**
  * Graceful Shutdown Protocol
- * 
+ *
  * WHY:
  * When a container (Docker/Kubernetes) or deployment service terminates our process,
  * it sends a SIGTERM or SIGINT signal.

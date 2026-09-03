@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * Registration Input Schema
- * 
+ *
  * Enforces input boundaries:
  * - Email lowercased and validated
  * - Minimum 8 character password

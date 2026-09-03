@@ -902,3 +902,57 @@
 * **The `preDeployCommand` Lifecycle**:
   * In modern PaaS engines (Render, Railway, Kubernetes init-containers), migrations run in a **pre-deploy step** *before* the new application container is routed user traffic.
   * If a migration fails (e.g. invalid SQL constraint or DB connection failure), deployment aborts immediately, and existing user traffic remains safely on the older, healthy container version with zero downtime.
+
+### Q86: What is the difference between Code Linting (ESLint) and Code Formatting (Prettier)?
+* **Prettier (Visual Consistency)**:
+  * Analyzes characters and formatting tokens to enforce visual rules: line length, indentation, quotes, and trailing commas. Prettier does **not** evaluate program logic or catch runtime bugs.
+* **ESLint (AST Static Code Analysis & Bug Detection)**:
+  * Parses TypeScript into an **Abstract Syntax Tree (AST)** to detect logical flaws, security vulnerabilities, and memory leaks:
+    * Floating unhandled Promises (`@typescript-eslint/no-floating-promises`).
+    * Accidental variable shadowing or unused memory allocations (`no-unused-vars`).
+    * Regular Expression Denial of Service (ReDoS) patterns.
+* **The Senior Integration Pattern (`eslint-config-prettier`)**:
+  * Combining both tools naively causes rule conflicts (e.g. ESLint arguing with Prettier over quote styles).
+  * Senior engineers use `eslint-config-prettier` to turn off all stylistic ESLint rules, allowing Prettier to handle 100% of formatting while ESLint focuses exclusively on code quality and bugs.
+
+### Q87: What is DevSecOps, and how do Dependency Auditing (`pnpm audit`) and Secret Scanning protect the pipeline?
+* **Software Composition Analysis (SCA / `pnpm audit`)**:
+  * Scans `pnpm-lock.yaml` dependencies against the National Vulnerability Database (CVEs).
+  * Configured with `--audit-level=high`, it halts the CI pipeline if any third-party library has known remote-code-execution or prototype-pollution vulnerabilities before code reaches production.
+* **Secret Scanning (Gitleaks / TruffleHog)**:
+  * Analyzes commit diffs using entropy checks and regex patterns to detect accidental leaks of API keys, private certificates, or database credentials before git history is published.
+
+### Q88: How does Modern CI/CD handle Cloud Secrets securely (GitHub Encrypted Secrets vs. OIDC)?
+* **GitHub Encrypted Secrets**:
+  * Stored using Libsodium public-key encryption and automatically masked (`***`) in build console logs.
+* **The "Keyless" OIDC Pattern (OpenID Connect)**:
+  * Rather than storing permanent, long-lived cloud credentials (like AWS IAM secret keys) inside GitHub, GitHub Actions requests short-lived cryptographic identity tokens via OIDC.
+  * The cloud provider (AWS/GCP) verifies the signature and issues a 15-minute temporary session token. If the GitHub account is compromised, there are zero static passwords for attackers to steal.
+
+### Q89: Why is immutable container tagging mandatory, and how does the "Expand and Contract" pattern enable database migration rollbacks?
+* **The Hazard of `:latest`**:
+  * Overwriting the `latest` tag leaves no history. If a deployment crashes in production, there is no previous image tag to revert to.
+* **Immutable Commit SHA Tags**:
+  * Every production container is tagged with its short Git commit SHA (`campushub:381cb3b`). Instant rollback takes seconds by pointing the orchestrator back to the previous known-good SHA.
+* **The "Expand and Contract" Migration Pattern**:
+  * Rolling back code is easy; rolling back destructive SQL migrations (`DROP COLUMN`) causes catastrophic data loss.
+  * **Phase 1 (Expand)**: Add the new column/table while keeping the old one intact.
+  * **Phase 2**: Deploy backend code reading from the new column and writing to both.
+  * **Phase 3 (Contract)**: Only after weeks of verified stability, run a subsequent migration dropping the deprecated column.
+
+### Q90: What are Feature Flags, and how do they decouple "Deployment" from "Release"?
+* **Deployment $\neq$ Release**:
+  * Deployment is the technical act of copying container bytes onto a server. Release is the business decision to expose that functionality to real end-users.
+* **Runtime Toggles**:
+  * Feature flags allow engineers to merge incomplete or high-risk features into `main` and deploy them to production in a "dark" (disabled) state.
+  * *Benefits*:
+    1. Enables **Canary evaluation** (turn on for 1% of users to observe error metrics).
+    2. Provides an **Instant Kill-Switch**: If an endpoint creates high database load, flipping the flag off in Redis or LaunchDarkly instantly deactivates the feature in 0.1s without needing a code redeployment or container restart.
+
+### Q91: What are Flaky Tests in CI, and how do high-scale engineering teams eliminate them?
+* **The Flakiness Dilemma**:
+  * Tests that pass 95% of the time and fail intermittently due to millisecond timing differences, network latency, or state leakage between tests. Flaky tests erode developer trust in CI.
+* **Mitigation Strategies**:
+  1. **Randomized Test Execution (`--shuffle`)**: Uncovers tests that secretly rely on database state left behind by an earlier test.
+  2. **Automated Quarantine**: Isolates erratic tests into a non-blocking diagnostic suite until patched.
+  3. **Deterministic Mocking**: Replacing external network requests with recorded in-memory fixtures to eliminate environmental variability.

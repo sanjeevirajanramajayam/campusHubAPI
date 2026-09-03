@@ -7,7 +7,7 @@ import { env } from '../../config/env.js';
 
 /**
  * Authentication HTTP Controller
- * 
+ *
  * WHY:
  * 1. Handles HTTP concerns: extracting body, setting status codes, managing cookie headers.
  * 2. Completely delegates business workflows to the injected AuthService.
@@ -18,11 +18,11 @@ export class AuthController {
 
   private setRefreshTokenCookie(res: Response, refreshToken: string): void {
     res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,                        // Blocks JavaScript XSS access
+      httpOnly: true, // Blocks JavaScript XSS access
       secure: env.NODE_ENV === 'production', // HTTPS only in production
-      sameSite: 'strict',                   // Prevents CSRF attacks
-      maxAge: 7 * 24 * 60 * 60 * 1000,      // 7 days in milliseconds
-      path: `${env.API_PREFIX}/auth`,       // Scoped only to auth endpoints
+      sameSite: 'strict', // Prevents CSRF attacks
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+      path: `${env.API_PREFIX}/auth`, // Scoped only to auth endpoints
     });
   }
 

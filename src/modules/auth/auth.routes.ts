@@ -8,7 +8,7 @@ import { registerSchema, loginSchema } from './auth.dto.js';
 
 /**
  * Creates and configures the Express Authentication Router
- * 
+ *
  * Composition Root for the Auth Module:
  * Instantiates PrismaUserRepository -> AuthService -> AuthController
  */

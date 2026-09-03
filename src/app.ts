@@ -22,7 +22,7 @@ export const createApp = (): Application => {
     cors({
       origin: env.CORS_ORIGIN,
       credentials: true,
-    })
+    }),
   );
 
   // 3. Body & Cookie Parsing Middleware (with size limits to prevent DoS payload attacks)

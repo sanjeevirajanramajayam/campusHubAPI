@@ -3,7 +3,7 @@ import { env } from '../config/env.js';
 
 /**
  * High-Performance Structured Logger (Pino)
- * 
+ *
  * WHY:
  * 1. Synchronous `console.log` can block the Node.js event loop during high throughput.
  * 2. Pino emits machine-readable JSON logs in production, which log aggregation

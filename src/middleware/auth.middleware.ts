@@ -5,7 +5,7 @@ import type { Role } from '@prisma/client';
 
 /**
  * TypeScript Declaration Merging
- * 
+ *
  * WHY:
  * In Express, `req` does not have a `user` property by default.
  * By merging into `Express.Request` in the global namespace,
@@ -26,14 +26,18 @@ declare global {
 
 /**
  * Authenticate Middleware
- * 
+ *
  * 1. Checks for 'Authorization: Bearer <token>' header.
  * 2. Verifies cryptographic signature and expiration via JwtService.
  * 3. Injects decoded claims into `req.user`.
  */
 import { tokenBlacklistService } from '../common/security/token-blacklist.service.js';
 
-export const authenticate = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+export const authenticate = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -64,7 +68,7 @@ export const authenticate = async (req: Request, _res: Response, next: NextFunct
 
 /**
  * Role-Based Access Control (RBAC) Middleware
- * 
+ *
  * Restricts endpoint execution to specific User roles (e.g. 'ADMIN', 'CLUB_LEADER').
  * Throws 403 Forbidden if the user lacks the required role.
  */

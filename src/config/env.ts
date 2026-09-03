@@ -6,7 +6,7 @@ dotenv.config();
 
 /**
  * Environment Schema Definition with Zod
- * 
+ *
  * WHY: Validating environment variables at startup guarantees that the application
  * "fails fast" immediately with clear, descriptive error messages if any required
  * secret, database URL, or port configuration is missing or malformed, rather than

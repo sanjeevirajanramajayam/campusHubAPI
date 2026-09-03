@@ -1,6 +1,9 @@
 import type { RefreshToken } from '@prisma/client';
 import { prisma } from '../../infrastructure/prisma/client.js';
-import type { IRefreshTokenRepository, CreateRefreshTokenDTO } from './refresh-token.repository.interface.js';
+import type {
+  IRefreshTokenRepository,
+  CreateRefreshTokenDTO,
+} from './refresh-token.repository.interface.js';
 
 export class PrismaRefreshTokenRepository implements IRefreshTokenRepository {
   async create(data: CreateRefreshTokenDTO): Promise<RefreshToken> {

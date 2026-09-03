@@ -3,20 +3,30 @@ name: CampusHub CI/CD Pipeline
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'CampusHub_Postman_Collection.json'
   pull_request:
     branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'CampusHub_Postman_Collection.json'
 
-# Concurrency: Cancel in-progress runs for the same branch to save runner minutes
+# Concurrency: Cancel stale in-progress runs for the same branch to conserve runner compute minutes
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   # ========================================================
-  # JOB 1: Linting, Typecheck, Schema Validation & Build
+  # JOB 1: Security Audit, Linting, Typecheck & Production Build
   # ========================================================
   quality-check:
-    name: Code Quality & Build Verification
+    name: Code Quality, Security & Build Verification
     runs-on: ubuntu-latest
 
     steps:
@@ -38,12 +48,27 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      # 🛡️ DevSecOps: Security Audit for High/Critical Vulnerabilities
+      - name: Dependency Security Audit
+        run: pnpm audit --audit-level=high
+
+      # 🎨 Code Formatting Guard: Prettier Check
+      - name: Code Formatting Check (Prettier)
+        run: pnpm format:check
+
+      # 🔍 Static Code Analysis: ESLint 9 AST Inspection
+      - name: Code Quality & Linter (ESLint)
+        run: pnpm lint
+
+      # 🗄️ Database Schema Verification: Prisma
       - name: Validate Prisma Schema
         run: pnpm prisma validate
 
+      # ⚡ Type Safety: Strict TypeScript Compiler
       - name: TypeScript Typecheck (Zero Tolerance)
         run: pnpm typecheck
 
+      # 📦 Bundler: Compile Production JavaScript Bundle
       - name: Compile Production JavaScript Bundle
         run: pnpm build
 
@@ -51,7 +76,7 @@ jobs:
   # JOB 2: Containerization & Docker Image Build
   # ========================================================
   docker-build:
-    name: Build & Verify Docker Image
+    name: Build & Verify Production Docker Image
     needs: quality-check
     runs-on: ubuntu-latest
 
@@ -62,12 +87,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Production Multi-Stage Docker Image
+      - name: Build Multi-Stage Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: false # Only test compilation; push when deploying to cloud registry
+          push: false # Test compilation; deployment triggered via Render Blueprint
           tags: campushub:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

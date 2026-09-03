@@ -5,7 +5,7 @@ import { env } from '../config/env.js';
 
 /**
  * Global Error Handling Middleware
- * 
+ *
  * WHY:
  * 1. Guarantees all API errors return a standard JSON envelope:
  *    { "success": false, "error": { "code": "...", "message": "...", "details": [...] } }
@@ -16,7 +16,7 @@ export const errorHandler: ErrorRequestHandler = (
   err: Error,
   _req: Request,
   res: Response,
-  _next: NextFunction
+  _next: NextFunction,
 ): void => {
   // If it is our trusted operational AppError
   if (err instanceof AppError) {
