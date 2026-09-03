@@ -27,10 +27,10 @@ export default defineConfig({
       ],
       // Threshold enforcement: Guarantees coverage never regresses
       thresholds: {
-        lines: 15,
-        functions: 20,
-        branches: 10,
-        statements: 15,
+        lines: 50,
+        functions: 45,
+        branches: 55,
+        statements: 50,
       },
     },
   },
