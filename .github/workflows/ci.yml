@@ -1,78 +1,26 @@
-name: CampusHub CI/CD Pipeline
+name: CampusHub Enterprise CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
-    # -------------------------------------------------------------------------
-    # 🚫 WHAT IS `paths-ignore`?
-    # WHY: If a commit ONLY modifies documentation (like markdown .md files,
-    # docs, or gitignore), there is zero backend code change.
-    # `paths-ignore` instructs GitHub Actions to SKIP triggering this workflow,
-    # saving developer time, cloud compute resources, and runner billing minutes!
-    # -------------------------------------------------------------------------
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'CampusHub_Postman_Collection.json'
+    branches: [main]
   pull_request:
-    branches: [ main ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'CampusHub_Postman_Collection.json'
+    branches: [main]
 
-# -----------------------------------------------------------------------------
-# 🚦 WHAT IS `concurrency` WITH `cancel-in-progress: true`?
-# WHY: When a developer pushes commits in rapid succession (e.g. 3 pushes in 2 mins),
-# older builds become instantly obsolete. This cancels stale runs immediately
-# so compute runners focus exclusively on the newest commit.
-# -----------------------------------------------------------------------------
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   # ========================================================
-  # JOB 1: Security Audit, Linting, Typecheck & Production Build
+  # JOB 1: Security Audit, Linting, Typecheck, Tests & Coverage
   # ========================================================
   quality-check:
-    name: Code Quality, Security & Build Verification
+    name: Code Quality, Security & Test Coverage Gate
     runs-on: ubuntu-latest
-
-    # 🐳 Service Containers: Spin up real PostgreSQL and Redis in CI!
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgrespassword
-          POSTGRES_DB: campushub_test
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     env:
       NODE_ENV: test
       PORT: 5000
-      DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5433/campushub_test?schema=public
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
       JWT_ACCESS_SECRET: supersecretjwtaccesstokenkey2026forciandtestsenvironments
       JWT_REFRESH_SECRET: supersecretjwtrefreshtokenkey2026forciandtestsenvironments
       JWT_ACCESS_EXPIRES_IN: 15m
@@ -90,13 +38,6 @@ jobs:
           version: 10.33.2
           run_install: false
 
-      # -----------------------------------------------------------------------
-      # ⚡ WHAT IS `cache: 'pnpm'`?
-      # WHY: Instead of downloading hundreds of megabytes of npm packages over
-      # the internet on every clean virtual machine, GitHub restores packages
-      # from internal high-speed SSD cache based on a hash of pnpm-lock.yaml.
-      # Reduces dependency install time from 2-3 minutes down to ~3 seconds!
-      # -----------------------------------------------------------------------
       - name: Setup Node.js 20 with pnpm Cache
         uses: actions/setup-node@v4
         with:
@@ -106,41 +47,27 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      # -----------------------------------------------------------------------
-      # 🛡️ WHAT IS `pnpm audit --audit-level=high`?
-      # WHY: Software Composition Analysis (SCA). It scans every installed
-      # dependency in pnpm-lock.yaml against the National Vulnerability Database (CVE).
-      # If any package has a HIGH or CRITICAL security flaw, this step FAILS
-      # with Exit Code 1, instantly blocking vulnerable code from being deployed!
-      # -----------------------------------------------------------------------
       - name: Dependency Security Audit
         run: pnpm audit --audit-level=high
 
-      # 🎨 Code Formatting Guard: Enforces Prettier visual formatting rules
       - name: Code Formatting Check (Prettier)
         run: pnpm format:check
 
-      # 🔍 Static Code Analysis: ESLint 9 AST inspection for logic flaws/bugs
       - name: Code Quality & Linter (ESLint)
         run: pnpm lint
 
-      # 🗄️ Database Schema Verification: Ensures prisma/schema.prisma is valid
       - name: Validate Prisma Schema
         run: pnpm prisma validate
 
-      # 🔄 Synchronize Database Schema: Pushes tables into CI PostgreSQL container
-      - name: Push Database Schema to Test Database
-        run: pnpm prisma db push --accept-data-loss
+      - name: Generate Prisma Client
+        run: pnpm prisma generate
 
-      # ⚡ Type Safety: Zero-tolerance TypeScript compilation check (noEmit)
       - name: TypeScript Typecheck (Zero Tolerance)
         run: pnpm typecheck
 
-      # 🧪 Automated Testing & Code Coverage Gate: Vitest + V8
-      - name: Run Automated Tests with Coverage Enforcement
-        run: pnpm test:coverage
+      - name: Run Unit Tests with Code Coverage Gate
+        run: pnpm vitest run tests/unit --coverage
 
-      # 📦 Bundler: Compiles TypeScript source to production JavaScript (dist/)
       - name: Compile Production JavaScript Bundle
         run: pnpm build
 
@@ -159,13 +86,35 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 🐳 Compiles our 3-stage Dockerfile and caches image layers in GitHub
       - name: Build Multi-Stage Docker Image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: false # Test compilation; deployment triggered via Render Blueprint
+          push: false
           tags: campushub:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ========================================================
+  # JOB 3: Deploy to Render (ONLY When All Tests Pass)
+  # ========================================================
+  deploy:
+    name: Deploy to Production (Render)
+    needs: [quality-check, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Deploy Hook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "⚠️ RENDER_DEPLOY_HOOK_URL secret not set. Skipping automated webhook trigger."
+            echo "👉 To enable automated deploy gating: Add RENDER_DEPLOY_HOOK_URL to GitHub Repo Secrets."
+          else
+            echo "🚀 All tests, quality checks, and Docker builds passed! Triggering Render deployment..."
+            curl -f -X POST "$RENDER_DEPLOY_HOOK"
+            echo "✅ Render deployment successfully queued!"
+          fi

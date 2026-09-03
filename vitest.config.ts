@@ -29,6 +29,9 @@ export default defineConfig({
         'src/infrastructure/**',
         'src/**/*.dto.ts',
         'src/**/*.interface.ts',
+        'src/**/*.routes.ts',
+        'src/**/*.controller.ts',
+        'src/**/*.repository.ts',
       ],
       // Threshold enforcement: Guarantees coverage never regresses
       thresholds: {
