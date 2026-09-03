@@ -1,0 +1,35 @@
+# Dependencies (Container builds its own native binaries)
+node_modules
+.pnpm-store
+
+# Compiled Output
+dist
+build
+
+# Version Control & Metadata
+.git
+.gitignore
+.github
+
+# Environment & Secrets (NEVER bake .env into Docker images!)
+.env
+.env.local
+*.pem
+
+# Logs & Debug
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Test & Coverage
+coverage
+.nyc_output
+scripts/*.test.js
+
+# IDE & OS files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
