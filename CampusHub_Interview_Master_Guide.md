@@ -648,3 +648,47 @@
   * Offloading these tasks prevents CPU-heavy operations from blocking the main JavaScript event loop.
 * **Configuring Concurrency**:
   * The thread pool size can be scaled up using the `UV_THREADPOOL_SIZE` environment variable (e.g. `UV_THREADPOOL_SIZE=16`).
+
+### Q67: How does the Node.js Event Loop work under the hood? Explain its 6 Phases.
+* **The Heart of libuv**:
+  * The Event Loop is an infinite `while` loop managed by libuv that orchestrates asynchronous non-blocking callbacks across 6 distinct phases:
+  * **1. Timers Phase**: Executes callbacks scheduled by `setTimeout()` and `setInterval()` whose threshold has elapsed.
+  * **2. Pending Callbacks Phase**: Executes I/O callbacks deferred from the previous loop iteration (e.g. some system-level errors like TCP connection refused).
+  * **3. Idle, Prepare Phase**: Internal libuv housekeeping only.
+  * **4. Poll Phase (The Main Stage)**: Retrieves new I/O events (incoming HTTP requests, DB responses). If the queue is empty, Node will block and wait here for new I/O unless `setImmediate()` callbacks are waiting.
+  * **5. Check Phase**: Dedicated exclusively to executing **`setImmediate()`** callbacks immediately after Poll finishes.
+  * **6. Close Callbacks Phase**: Executes socket and handle cleanup callbacks (e.g. `socket.on('close', ...)`).
+* **The Secret (Microtask Queue Priority)**:
+  * Between *every single phase* (and even between individual callbacks in modern Node), Node drains the **Microtask Queue** (`process.nextTick` and Promises) before moving to the next event loop phase!
+
+### Q68: What is the difference between `process.nextTick()`, `Promise.then()`, and `setImmediate()`? What is Event Loop Starvation?
+* **1. `process.nextTick()` (Highest Priority Microtask)**:
+  * Does NOT belong to the Event Loop phases! It executes **immediately after the currently running operation finishes**, before the event loop is allowed to continue to ANY phase.
+* **2. `Promise.then()` / `queueMicrotask()` (Standard Microtask)**:
+  * Executes immediately after the current operation finishes, right after `process.nextTick()` queue is drained.
+* **3. `setImmediate()` (Macrotask in Check Phase)**:
+  * Designed to run in the **Check Phase** of the event loop after the Poll phase completes. It yields control back to the event loop.
+* **Event Loop Starvation (The Danger of Recursive `nextTick`)**:
+  * If code calls `process.nextTick()` recursively, the microtask queue is never empty. The event loop is **completely frozen and starved**, unable to reach the Poll phase to accept incoming HTTP connections or handle timer expirations!
+
+### Q69: What are Node.js Streams and Buffers, and why does piping streams (`pipeline`) prevent Out-Of-Memory (OOM) crashes?
+* **The Problem with `fs.readFile()` / Memory Buffering**:
+  * If a user requests a 2GB campus event video or CSV report, using `fs.readFile()` forces Node.js to load the entire 2GB file into V8 heap memory at once. If 3 users download simultaneously, Node crashes with `JavaScript heap out of memory`.
+* **Streams (Chunked Processing)**:
+  * Streams process data piece-by-piece in small binary chunks (default **64KB** buffer chunks).
+  * Only a tiny 64KB chunk resides in RAM at any millisecond.
+* **Stream Piping & Backpressure**:
+  * `readable.pipe(writable)` connects a source (disk file) to a destination (HTTP response `res`).
+  * **Backpressure**: If the network is slow and the client cannot receive bytes as fast as the disk reads them, the stream automatically pauses the disk read until the network buffer drains, preventing RAM bloat.
+  * **`stream.promises.pipeline`**: Modern best practice that safely destroys streams and handles errors if a client disconnects mid-transfer, preventing socket memory leaks.
+
+### Q70: How does Node.js handle heavy CPU-intensive operations without freezing? (Worker Threads vs. Child Processes vs. Cluster Module)
+* **The Problem (Event Loop Blocking)**:
+  * Because JavaScript is single-threaded, running a heavy synchronous CPU loop (e.g. image processing, AI embeddings, large JSON parsing) locks the Call Stack for seconds. All other HTTP requests from all users freeze.
+* **1. Worker Threads (`worker_threads` module - Recommended for in-process CPU tasks)**:
+  * Spawns true parallel OS threads running independent V8 engines inside the *same* Node process.
+  * They can share memory via `SharedArrayBuffer`, making them ultra-fast for heavy CPU calculations without blocking the main event loop.
+* **2. Child Processes (`child_process.fork()` / `spawn()`)**:
+  * Spawns a completely separate, isolated operating system process with its own memory space. Communicates via Inter-Process Communication (IPC). Best for running external system binaries (e.g. `ffmpeg` or Python scripts).
+* **3. Cluster Module**:
+  * Spawns multiple identical copies of our entire Express server (one per CPU core) that share the same server port (e.g. port 5000), using the OS load balancer to distribute HTTP requests across all CPU cores.
