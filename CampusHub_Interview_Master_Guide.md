@@ -838,3 +838,30 @@
   * **`.bind(obj)`**: Returns a new function with `this` permanently glued to `obj` to be called later.
   * **`.call(obj, arg1, arg2)`**: Executes the function immediately with `this = obj` and comma-separated arguments.
   * **`.apply(obj, [arg1, arg2])`**: Executes the function immediately with `this = obj` and arguments passed as an Array.
+
+### Q80: How does a Multi-Stage Dockerfile work, and why is non-root (`USER node`) security mandatory in production?
+* **The Problem with Single-Stage Dockerfiles**:
+  * A naive Dockerfile (`FROM node:20`) includes compilers (`tsc`), development toolchains, source files, and devDependencies, resulting in bloated **1.5 GB images** that are slow to download across Kubernetes nodes and expensive to store.
+* **The 3-Stage Architecture**:
+  * **Stage 1 (`deps`)**: Copies only `package.json` and `pnpm-lock.yaml` to run `pnpm install --frozen-lockfile`. Leveraging Docker layer caching, this layer is only rebuilt when dependencies actually change.
+  * **Stage 2 (`builder`)**: Generates Linux-native Prisma binaries, compiles TypeScript into `dist/`, and runs `pnpm prune --prod` to strip development packages.
+  * **Stage 3 (`runner`)**: Uses lean `node:20-alpine`, copying *only* compiled JavaScript (`dist/`) and production `node_modules`. Image size is slashed from **1.5 GB ──► 107 MB** (a 93% reduction!).
+* **Container Security: The Non-Root Rule (`USER node`)**:
+  * By default, Docker containers run as **root (`UID 0`)**. If an attacker discovers a Remote Code Execution (RCE) flaw, they possess root privileges over the container and can potentially escape to the host kernel.
+  * Declaring `USER node` forces the container to execute under an unprivileged user (UID 1000), following the Principle of Least Privilege.
+* **The Role of `.dockerignore`**:
+  * Excludes local `node_modules`, `dist/`, and especially `.env` secrets from being baked into public container images.
+
+### Q81: What is Continuous Integration (CI) with GitHub Actions, and how do you optimize pipeline performance?
+* **Continuous Integration Philosophy**:
+  * Automatically testing and validating every code commit pushed to a shared repository to detect regressions and syntax/type flaws immediately.
+* **The 5 Quality Gates in our CampusHub Pipeline**:
+  1. **Dependency Locking**: `pnpm install --frozen-lockfile` ensures builds fail if `pnpm-lock.yaml` does not match `package.json`.
+  2. **Schema Verification**: `prisma validate` checks relational database schema consistency.
+  3. **Type Safety**: `tsc --noEmit` enforces zero TypeScript compilation errors.
+  4. **Build Verification**: `pnpm build` ensures production bundles compile successfully.
+  5. **Container Verification**: Runs Docker Buildx to guarantee container builds succeed before deploying.
+* **Pipeline Optimization Techniques**:
+  * **Dependency Caching (`actions/setup-node with cache: 'pnpm'`)**: Saves downloaded package tarballs between workflow runs, cutting CI time from 3 minutes to 25 seconds.
+  * **Concurrency Cancellation (`cancel-in-progress: true`)**: If a developer pushes 3 commits in rapid succession, GitHub Actions automatically aborts stale in-progress runs, saving runner minutes and cloud compute costs.
+  * **Docker Buildx Cache (`cache-from/to: type=gha`)**: Shares Docker build layers across CI runs so unchanged stages don't re-execute.
