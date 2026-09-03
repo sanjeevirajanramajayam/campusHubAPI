@@ -22,8 +22,8 @@
     "test:load": "tsx scripts/load-test.ts"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.2.0",
     "@prisma/client": "^6.4.1",
-    "argon2": "^0.45.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^16.4.7",

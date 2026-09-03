@@ -1024,4 +1024,35 @@
   * Any competing transaction attempting to execute `SELECT ... FOR UPDATE`, `UPDATE`, or `DELETE` on that specific row is automatically suspended by the PostgreSQL kernel and placed in a wait queue.
   * When Transaction 1 commits, Transaction 2 unpauses and reads the freshly committed row state (`registeredCount = 50`), safely rejecting the request with `409 Conflict (Event Sold Out)`.
 * **Prisma Implementation**:
-  * Prisma's ORM syntax lacks native row-locking clauses. Senior engineers execute `SELECT * FROM "events" WHERE "id" = $1::uuid FOR UPDATE` via `tx.$queryRaw` inside an interactive ACID transaction (`prisma.$transaction`).
+  * Prisma's ORM syntax lacks native row-locking clauses. Senior engineers execute `SELECT * FROM "events" WHERE "id" = $1 FOR UPDATE` via `tx.$queryRaw` inside an interactive ACID transaction (`prisma.$transaction`).
+
+### Q98: Why do Node.js Native C++ Addons (`node-gyp`, `argon2`) cause `SIGSEGV` (Exit Code 139) in Docker Containers, and how does Rust N-API (`@node-rs/argon2`) eliminate Linker Faults?
+* **The Exit 139 / SIGSEGV Anatomy**:
+  * Signal 11 (`SIGSEGV` - Segmentation Fault) occurs when a process attempts to access a hardware memory address that it does not own or that does not exist in its virtual address table. In Unix, this exits with `128 + 11 = 139`.
+* **The C++ Addon Gotcha (musl vs. glibc Mismatch)**:
+  * Packages like legacy `argon2` or `node-canvas` rely on `node-gyp` compiling C++ code into a dynamic shared object (`.node` binary).
+  * Alpine Linux uses `musl libc`, while Debian/Ubuntu/RHEL and prebuilt binaries use GNU `glibc`.
+  * When an addon compiled against glibc runs in an environment missing glibc symbols, the dynamic linker attempts to dereference null or invalid function pointers, causing an instantaneous segmentation fault during `require()` / `import`.
+  * Furthermore, modern package managers like `pnpm v10` aggressively block build scripts by default (`pnpm approve-builds`), preventing C++ addon compilation altogether!
+* **The Rust N-API Solution (`@node-rs/argon2`)**:
+  * Modern production applications replace legacy C++ addons with **Rust N-API crates** (`@node-rs/*`).
+  * Rust's strict memory safety guarantees eliminate dangling pointers and buffer overflows at compile-time.
+  * `@node-rs` bundles pre-compiled, statically verified native binaries for all major architectures and libc combinations (Debian GNU, Alpine musl, macOS ARM64/Apple Silicon, Windows MSVC).
+  * **Zero build dependencies**: No Python, no GCC, no Make, and zero risk of status 139 container crashes.
+
+### Q99: What are Prisma `binaryTargets` and why does omitting them cause `PrismaClientInitializationError: Query Engine Not Found` in Production?
+* **The Architecture Mismatch Problem**:
+  * Prisma's Query Engine is written in Rust and compiled to a platform-specific binary (e.g. `query_engine-windows.dll.node` on Windows, `query_engine-debian-openssl-3.0.x.so.node` on Debian 12, `query_engine-linux-musl-openssl-3.0.x.so.node` on Alpine).
+  * When `prisma generate` runs on a developer's Windows or macOS workstation, it only downloads the query engine matching the local OS.
+* **Why Multi-Stage Docker Builds Crash**:
+  * If the Dockerfile copies `node_modules` generated from the host or fails to download the Linux engine during the build stage, the container boots, executes `new PrismaClient()`, and immediately throws `PrismaClientInitializationError: Could not locate Query Engine for runtime "debian-openssl-3.0.x"`.
+* **The Declarative Schema Solution**:
+  * In `prisma/schema.prisma`, explicitly declare all deployment targets:
+    ```prisma
+    generator client {
+      provider      = "prisma-client-js"
+      binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+    }
+    ```
+  * During build, Prisma generates and packages the exact binary engines for both development workstations and Linux production clouds, guaranteeing zero runtime initialization failures.
+
