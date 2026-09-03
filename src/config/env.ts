@@ -12,6 +12,7 @@ dotenv.config();
  * secret, database URL, or port configuration is missing or malformed, rather than
  * crashing unpredictably mid-request in production.
  */
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(5000),

@@ -692,3 +692,26 @@
   * Spawns a completely separate, isolated operating system process with its own memory space. Communicates via Inter-Process Communication (IPC). Best for running external system binaries (e.g. `ffmpeg` or Python scripts).
 * **3. Cluster Module**:
   * Spawns multiple identical copies of our entire Express server (one per CPU core) that share the same server port (e.g. port 5000), using the OS load balancer to distribute HTTP requests across all CPU cores.
+
+### Q71: What is a DTO (Data Transfer Object), and how does it prevent "Over-Posting" security attacks?
+* **Definition (Martin Fowler)**:
+  * An object with zero business logic or behavior whose sole purpose is to carry data across network or layer boundaries (e.g. HTTP payload into Service or Service into Repository).
+* **Defense Against Over-Posting (Mass Assignment)**:
+  * If a client submits malicious hidden fields in the JSON payload (e.g. `{ name: "Robotics Club", role: "SUPER_ADMIN", isVerified: true }`), passing `req.body` directly to the database causes severe privilege escalation.
+  * A strict DTO acts as an allowlist, ensuring only permitted fields are accepted and passed downstream.
+* **Decoupling from Database Schemas**:
+  * The database `User` table may have 25 columns, but registration only requires 4 fields. DTOs insulate business workflows from database storage details.
+
+### Q72: What is a "Slug" in web development, how is it generated, and how do you handle Slug Collisions?
+* **Origin and Purpose**:
+  * Originally from journalism (a short working headline). In modern web applications, a slug is a human-readable, URL-safe string derived from a title (e.g. `stanford-robotics-club` instead of an ugly UUID `9b1deb4d-...`).
+  * Improves SEO and makes URLs memorable and shareable.
+* **Slugification Mechanics**:
+  1. Convert string to lowercase.
+  2. Normalize and strip accents/diacritics (`é` ➔ `e`).
+  3. Replace whitespace and symbols (`&`, `/`) with hyphens (`-`).
+  4. Strip all remaining non-alphanumeric characters.
+  5. Trim duplicate or trailing hyphens.
+* **Slug Collision Handling**:
+  * Because database schemas require slugs to be unique (`slug String @unique`), duplicate club names (e.g. two "Chess Club" entries) trigger unique constraint failures.
+  * **Production Resolution**: The service layer checks `findBySlug()`. If a collision exists, it automatically appends an incremental counter or short unique suffix (e.g. `chess-club-1`, `chess-club-2`) before persisting.
