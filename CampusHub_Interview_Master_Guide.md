@@ -620,3 +620,31 @@
   * As the key approaches expiration, requests have a mathematically increasing probability to refresh the cache in the background while still returning current cached data to the user. The key never truly expires.
 * **Solution 3: Background Worker Re-warming**:
   * Store critical content in Redis with no TTL (`PERSIST`), and run a background cron worker (e.g. BullMQ) every 5 minutes to update the cache asynchronously. HTTP requests never perform database reads.
+
+### Q65: What is Database Connection Pool Starvation, and why can Node.js's high concurrency crash PostgreSQL?
+* **The Architectural Mismatch**:
+  * Node.js handles 50,000 concurrent HTTP connections effortlessly using its single-threaded non-blocking event loop (~2KB memory per socket).
+  * PostgreSQL uses a **Process-Per-Connection** model where each connection spawns an isolated OS process consuming ~10MB of RAM. Spawning 50,000 Postgres connections would require 500GB of RAM and destroy the CPU via context switching. Hence, Postgres caps `max_connections` (default 100).
+* **Connection Pool Starvation in Node.js**:
+  * Prisma maintains a local pool of ~10 connections. If thousands of requests arrive simultaneously, they enter an in-memory waiting queue. If a request waits longer than Prisma's connection timeout (default 10s), it fails with `PrismaClientInitializationError: Timed out fetching a new connection`.
+* **Production Mitigations**:
+  * **PgBouncer in Transaction Pooling Mode**: Sits as a C-based proxy between Node.js and PostgreSQL. It borrows a Postgres connection for only the few milliseconds a query runs, then immediately yields it to other clients, allowing 20,000 Node clients to run on just 50 Postgres connections.
+  * **Never Run Non-DB Work Inside Transactions**: Performing external HTTP calls (Stripe, Email) inside `prisma.$transaction()` holds database connections hostage for seconds, starving the pool.
+  * **HikariCP Formula**: Right-size connections to $(\text{CPU Cores} \times 2) + \text{Disk Spindles}$. Adding more connections often slows down databases due to CPU context switching.
+  * **Read Replicas**: Route read-heavy `SELECT` traffic away from the primary write pool.
+
+### Q66: Is Node.js Single-Threaded or Multi-Threaded? Explain V8 vs. libuv and the Thread Pool.
+* **The Definitive Answer**:
+  * **JavaScript execution is strictly SINGLE-THREADED** (one Call Stack, one Heap inside the V8 engine).
+  * **The Node.js RUNTIME is fully MULTI-THREADED** under the hood via C++ libraries.
+* **How Network I/O is Handled (Zero Threads Needed)**:
+  * Network operations (Express HTTP sockets, PostgreSQL queries, Redis calls) do not use worker threads. They are delegated to native **Operating System Kernel polling APIs** (`epoll` on Linux, `IOCP` on Windows, `kqueue` on macOS). The OS notifies Node when network packets arrive.
+* **libuv Background Thread Pool**:
+  * Tasks that cannot be performed asynchronously by OS kernels are offloaded to **libuv's background thread pool (default 4 threads)**:
+    1. **Cryptographic Operations** (`argon2.hash()`, `crypto.pbkdf2`).
+    2. **File System I/O** (`fs.readFile()`, `fs.writeFile()`).
+    3. **DNS Resolution** (`dns.lookup()`).
+    4. **Compression** (`zlib`).
+  * Offloading these tasks prevents CPU-heavy operations from blocking the main JavaScript event loop.
+* **Configuring Concurrency**:
+  * The thread pool size can be scaled up using the `UV_THREADPOOL_SIZE` environment variable (e.g. `UV_THREADPOOL_SIZE=16`).
