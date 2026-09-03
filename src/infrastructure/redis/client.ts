@@ -10,8 +10,11 @@ import { logger } from '../../common/logger.js';
  * 2. Employs exponential backoff retry strategy for connection resilience.
  * 3. Handles connection lifecycle logging via EventEmitter hooks.
  */
-export const redis = env.REDIS_URL
-  ? new Redis(env.REDIS_URL, {
+const connectionTarget = env.REDIS_URL 
+  || (env.REDIS_HOST.startsWith('redis://') || env.REDIS_HOST.startsWith('rediss://') ? env.REDIS_HOST : null);
+
+export const redis = connectionTarget
+  ? new Redis(connectionTarget, {
       maxRetriesPerRequest: 3,
       retryStrategy(times: number) {
         return Math.min(times * 100, 3000);
@@ -28,7 +31,7 @@ export const redis = env.REDIS_URL
     });
 
 redis.on('connect', () => {
-  const target = env.REDIS_URL ? 'via REDIS_URL' : `at ${env.REDIS_HOST}:${env.REDIS_PORT}`;
+  const target = connectionTarget ? 'via connection string' : `at ${env.REDIS_HOST}:${env.REDIS_PORT}`;
   logger.info(`⚡ Connected to Redis ${target}`);
 });
 
