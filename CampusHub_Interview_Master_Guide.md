@@ -563,3 +563,29 @@
     Quickly cleans dead rows using the `expiresAt` B-Tree index.
   * **Immediate Predecessor Pruning**: Only store the current active token and its immediate predecessor (to catch replays); delete all older ancestors upon rotation.
   * **Hyper-Scale Redis Session Store**: At massive scale (100k req/sec), store refresh tokens in Redis with native key expiration (`EXPIRE token:key 604800`). Redis automatically purges dead sessions from RAM with zero SQL queries and sub-millisecond lookups.
+
+### Q60: If we implement all required security measures (HttpOnly, Secure, SameSite, HTTPS), how can a Refresh Token STILL be stolen?
+* **The Reality of Beyond-the-Server Threat Vectors**:
+  * Implementing perfect backend and cookie security mitigates network sniffing and script injection (XSS), but cannot control compromised client operating systems or extensions.
+* **1. OS-Level Infostealer Malware (RedLine, Lumma, Vidar)**:
+  * Malware running under the user's OS profile can read the browser's on-disk SQLite cookie store (`AppData\Local\Google\Chrome\...\Cookies`) and use OS APIs (Windows DPAPI / macOS Keychain) to decrypt and steal `HttpOnly` cookies.
+* **2. Privileged Browser Extensions**:
+  * Browser extensions granted `"cookies"` and `<all_urls>` permissions bypass the web page DOM sandbox. Methods like `chrome.cookies.get()` can extract `HttpOnly` cookies regardless of server flags.
+* **3. Physical Device Access & Browser DevTools**:
+  * Unattended workstations allow attackers to inspect Chrome DevTools (`Application ➔ Cookies`), which displays `HttpOnly` cookie values in cleartext.
+* **4. Reverse Proxy / Ingress Log Leaks**:
+  * Misconfigured logging on TLS-termination load balancers (NGINX, Cloudflare, AWS ALB) or APM monitoring tools (Datadog, Sentry) can accidentally record raw HTTP `Cookie:` request headers into log files.
+* **Why Token Family Rotation (RTR) is the Ultimate Defense**:
+  * Because client-side theft cannot be 100% prevented, backend **Token Family Rotation** acts as the safety net: detecting token reuse when the legitimate user and attacker both attempt to refresh, instantly nuking the entire session family.
+
+### Q61: Are JWTs encrypted, and when should you use JWE (JSON Web Encryption) over standard JWS?
+* **Standard JWTs (JWS - JSON Web Signature) are NOT Encrypted**:
+  * The header and payload are merely **Base64URL encoded**. Anyone who inspects the token can paste it into `jwt.io` and read all claims (`userId`, `email`, `role`) in plain text.
+  * The cryptographic signature provides **Integrity and Tamper-Proofing** (preventing unauthorized role escalation), but zero confidentiality.
+* **When to Use JWE (JSON Web Encryption)**:
+  * When tokens must carry **confidential, sensitive data** (PII, SSNs, healthcare/HIPAA records, proprietary internal keys) that must remain concealed from the client and proxies.
+  * JWE encrypts the payload using symmetric (AES-GCM) or asymmetric (RSA-OAEP) algorithms into opaque ciphertext.
+* **Why JWS is Preferred for Standard Web Applications**:
+  * **Lower CPU Overhead**: JWS signing/verification is much faster than AES/RSA decryption.
+  * **Compact Size**: JWE payloads are significantly larger, consuming more network bandwidth on every HTTP request.
+  * **Client Inspection**: Frontend UI often legitimately needs to inspect claims (like `role` or `userName`) without an extra round-trip API call.
