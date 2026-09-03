@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import jwt, { type Secret, type SignOptions } from 'jsonwebtoken';
 import { env } from '../../config/env.js';
 import { UnauthorizedError } from '../errors/app-error.js';
@@ -44,6 +45,7 @@ export class JwtService {
   generateRefreshToken(payload: RefreshTokenPayload): string {
     const options: SignOptions = {
       expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions['expiresIn'],
+      jwtid: randomUUID(), // ⚡ Guarantees every single refresh token string is 100% unique!
     };
     return jwt.sign(payload, env.JWT_REFRESH_SECRET as Secret, options);
   }
