@@ -31,23 +31,35 @@ declare global {
  * 2. Verifies cryptographic signature and expiration via JwtService.
  * 3. Injects decoded claims into `req.user`.
  */
-export const authenticate = (req: Request, _res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
+import { tokenBlacklistService } from '../common/security/token-blacklist.service.js';
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new UnauthorizedError('Authentication token required');
+export const authenticate = async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedError('Authentication token required');
+    }
+
+    const token = authHeader.split(' ')[1];
+    const payload = jwtService.verifyAccessToken(token);
+
+    // ⚡ Instant Revocation Check (<0.5ms in Redis RAM):
+    const isRevoked = await tokenBlacklistService.isBlacklisted(token);
+    if (isRevoked) {
+      throw new UnauthorizedError('Token has been revoked. Please log in again.');
+    }
+
+    req.user = {
+      id: payload.userId,
+      email: payload.email,
+      role: payload.role,
+    };
+
+    next();
+  } catch (err) {
+    next(err);
   }
-
-  const token = authHeader.split(' ')[1];
-  const payload = jwtService.verifyAccessToken(token);
-
-  req.user = {
-    id: payload.userId,
-    email: payload.email,
-    role: payload.role,
-  };
-
-  next();
 };
 
 /**

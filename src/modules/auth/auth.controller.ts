@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { AuthService } from './auth.service.js';
 import type { RegisterInput, LoginInput } from './auth.dto.js';
 import { UnauthorizedError } from '../../common/errors/app-error.js';
+import { tokenBlacklistService } from '../../common/security/token-blacklist.service.js';
 import { env } from '../../config/env.js';
 
 /**
@@ -102,12 +103,20 @@ export class AuthController {
 
   logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      // 1. Invalidate Refresh Token session from database
       const rawRefreshToken = req.cookies.refreshToken as string | undefined;
-
       if (rawRefreshToken) {
         await this.authService.logout(rawRefreshToken);
       }
 
+      // 2. Invalidate Access Token in Redis Blacklist (Instant Revocation!)
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const accessToken = authHeader.split(' ')[1];
+        await tokenBlacklistService.blacklistToken(accessToken);
+      }
+
+      // 3. Clear HttpOnly Cookie
       res.clearCookie('refreshToken', {
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
