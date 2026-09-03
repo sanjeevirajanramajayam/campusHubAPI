@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { AuthService } from './auth.service.js';
 import type { RegisterInput, LoginInput } from './auth.dto.js';
+import { UnauthorizedError } from '../../common/errors/app-error.js';
 import { env } from '../../config/env.js';
 
 /**
@@ -69,6 +70,54 @@ export class AuthController {
       res.status(200).json({
         success: true,
         data: { user },
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const rawRefreshToken = req.cookies.refreshToken as string | undefined;
+
+      if (!rawRefreshToken) {
+        throw new UnauthorizedError('Refresh token required');
+      }
+
+      const result = await this.authService.refresh(rawRefreshToken);
+
+      this.setRefreshTokenCookie(res, result.tokens.refreshToken);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          user: result.user,
+          accessToken: result.tokens.accessToken,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  logout = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const rawRefreshToken = req.cookies.refreshToken as string | undefined;
+
+      if (rawRefreshToken) {
+        await this.authService.logout(rawRefreshToken);
+      }
+
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: `${env.API_PREFIX}/auth`,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Logged out successfully',
       });
     } catch (err) {
       next(err);
