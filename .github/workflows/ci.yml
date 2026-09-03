@@ -93,6 +93,10 @@ jobs:
       - name: TypeScript Typecheck (Zero Tolerance)
         run: pnpm typecheck
 
+      # 🧪 Automated Testing & Code Coverage Gate: Vitest + V8
+      - name: Run Automated Tests with Coverage Enforcement
+        run: pnpm test:coverage
+
       # 📦 Bundler: Compiles TypeScript source to production JavaScript (dist/)
       - name: Compile Production JavaScript Bundle
         run: pnpm build
