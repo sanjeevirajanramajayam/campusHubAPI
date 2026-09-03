@@ -606,3 +606,17 @@
   * Guarantees every single endpoint returns an identical JSON envelope (`{ success: false, error: { code, message, details } }`), eliminating client-side error parsing inconsistencies.
 * **4. DRY (Eliminating 1,000 Lines of Boilerplate)**:
   * Controllers avoid repetitive 15-line `try/catch` and HTTP status mapping logic, simply delegating uncaught errors to the central safety net.
+
+### Q64: What is the "Thundering Herd" (Cache Stampede) Problem, and how do you prevent it in Redis?
+* **The Disaster Scenario (The Stampede)**:
+  * A heavily accessed key (e.g. high-profile university event or breaking news) is cached in Redis with a 1-hour TTL.
+  * When the key expires at 1:00:00 PM, 10,000 concurrent requests experience a **Cache Miss simultaneously**.
+  * All 10,000 requests fire identical heavy SQL `JOIN` queries at PostgreSQL simultaneously, exhausting connection pools, spiking CPU to 100%, and causing cascading `504 Gateway Timeouts`.
+* **Solution 1: Distributed Mutex Lock (Single-Flight Pattern - Recommended)**:
+  * When a cache miss occurs, requests compete for an atomic Redis lock: `SET lock:key "locked" NX PX 5000`.
+  * **Only 1 request acquires the lock** to query PostgreSQL and re-warm the Redis cache.
+  * The remaining 9,999 requests wait 50ms and read the freshly populated cache once the lock is released. PostgreSQL handles **1 query instead of 10,000**.
+* **Solution 2: Probabilistic Early Expiration (XFetch Algorithm)**:
+  * As the key approaches expiration, requests have a mathematically increasing probability to refresh the cache in the background while still returning current cached data to the user. The key never truly expires.
+* **Solution 3: Background Worker Re-warming**:
+  * Store critical content in Redis with no TTL (`PERSIST`), and run a background cron worker (e.g. BullMQ) every 5 minutes to update the cache asynchronously. HTTP requests never perform database reads.
