@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { env } from './config/env.js';
 import { logger } from './common/logger.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import { idempotency } from './middleware/idempotency.middleware.js';
 import { NotFoundError } from './common/errors/app-error.js';
 
 import cookieParser from 'cookie-parser';
@@ -28,6 +29,9 @@ export const createApp = (): Application => {
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
   app.use(cookieParser());
+
+  // 4. Distributed Idempotency Guard (RFC 9440)
+  app.use(idempotency());
 
   // 4. Request Logging Middleware
   app.use((req, res, next) => {

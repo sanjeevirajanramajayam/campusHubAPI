@@ -60,3 +60,10 @@ export class ValidationError extends AppError {
     super(message, 422, 'VALIDATION_ERROR', details);
   }
 }
+
+export class UnprocessableEntityError extends AppError {
+  constructor(message = 'Unprocessable Entity', code = 'UNPROCESSABLE_ENTITY', details?: unknown) {
+    super(message, 422, code, details);
+  }
+}
+
