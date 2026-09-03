@@ -12,15 +12,45 @@ concurrency:
 
 jobs:
   # ========================================================
-  # JOB 1: Security Audit, Linting, Typecheck, Tests & Coverage
+  # JOB 1: Security, Quality, Typecheck, Database & Full Tests
   # ========================================================
   quality-check:
-    name: Code Quality, Security & Test Coverage Gate
+    name: Code Quality, Security & Full Test Suite
     runs-on: ubuntu-latest
+
+    # 🐳 Service Containers: Spin up isolated real PostgreSQL and Redis in CI
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: campushub_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
 
     env:
       NODE_ENV: test
       PORT: 5000
+      DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5433/campushub_test?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
       JWT_ACCESS_SECRET: supersecretjwtaccesstokenkey2026forciandtestsenvironments
       JWT_REFRESH_SECRET: supersecretjwtrefreshtokenkey2026forciandtestsenvironments
       JWT_ACCESS_EXPIRES_IN: 15m
@@ -62,11 +92,23 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm prisma generate
 
+      - name: Push Schema to CI PostgreSQL Container
+        run: pnpm prisma db push --accept-data-loss
+
       - name: TypeScript Typecheck (Zero Tolerance)
         run: pnpm typecheck
 
-      - name: Run Unit Tests with Code Coverage Gate
+      - name: Run Unit Tests with Coverage Gate
         run: pnpm vitest run tests/unit --coverage
+
+      - name: Run Integration Tests (Real PostgreSQL & Redis)
+        run: pnpm test:integration
+
+      - name: Run Concurrency Race-Condition Tests (Row Locking)
+        run: pnpm test:concurrency
+
+      - name: Run Security & Auth Tampering Tests
+        run: pnpm test:security
 
       - name: Compile Production JavaScript Bundle
         run: pnpm build
