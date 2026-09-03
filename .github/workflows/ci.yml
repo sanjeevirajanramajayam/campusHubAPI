@@ -41,6 +41,45 @@ jobs:
     name: Code Quality, Security & Build Verification
     runs-on: ubuntu-latest
 
+    # 🐳 Service Containers: Spin up real PostgreSQL and Redis in CI!
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: campushub_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      PORT: 5000
+      DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5433/campushub_test?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      JWT_ACCESS_SECRET: supersecretjwtaccesstokenkey2026forciandtestsenvironments
+      JWT_REFRESH_SECRET: supersecretjwtrefreshtokenkey2026forciandtestsenvironments
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      CORS_ORIGIN: http://localhost:3000
+      API_PREFIX: /api/v1
+
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -88,6 +127,10 @@ jobs:
       # 🗄️ Database Schema Verification: Ensures prisma/schema.prisma is valid
       - name: Validate Prisma Schema
         run: pnpm prisma validate
+
+      # 🔄 Synchronize Database Schema: Pushes tables into CI PostgreSQL container
+      - name: Push Database Schema to Test Database
+        run: pnpm prisma db push --accept-data-loss
 
       # ⚡ Type Safety: Zero-tolerance TypeScript compilation check (noEmit)
       - name: TypeScript Typecheck (Zero Tolerance)
