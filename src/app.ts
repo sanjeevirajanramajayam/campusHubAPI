@@ -8,6 +8,7 @@ import { NotFoundError } from './common/errors/app-error.js';
 
 import cookieParser from 'cookie-parser';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
+import { createClubRouter } from './modules/clubs/club.routes.js';
 
 export const createApp = (): Application => {
   const app = express();
@@ -68,6 +69,9 @@ export const createApp = (): Application => {
 
   // Mount Auth Module
   apiRouter.use('/auth', createAuthRouter());
+
+  // Mount Club Module
+  apiRouter.use('/clubs', createClubRouter());
 
   // Mount API Router under configured prefix (e.g. /api/v1)
   app.use(env.API_PREFIX, apiRouter);
