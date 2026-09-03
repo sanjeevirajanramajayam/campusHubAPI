@@ -6,6 +6,9 @@ import { logger } from './common/logger.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { NotFoundError } from './common/errors/app-error.js';
 
+import cookieParser from 'cookie-parser';
+import { createAuthRouter } from './modules/auth/auth.routes.js';
+
 export const createApp = (): Application => {
   const app = express();
 
@@ -20,9 +23,10 @@ export const createApp = (): Application => {
     })
   );
 
-  // 3. Body Parsing Middleware (with size limits to prevent DoS payload attacks)
+  // 3. Body & Cookie Parsing Middleware (with size limits to prevent DoS payload attacks)
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+  app.use(cookieParser());
 
   // 4. Request Logging Middleware
   app.use((req, res, next) => {
@@ -61,6 +65,9 @@ export const createApp = (): Application => {
       version: 'v1',
     });
   });
+
+  // Mount Auth Module
+  apiRouter.use('/auth', createAuthRouter());
 
   // Mount API Router under configured prefix (e.g. /api/v1)
   app.use(env.API_PREFIX, apiRouter);
