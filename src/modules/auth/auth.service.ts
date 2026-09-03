@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import type { IUserRepository } from '../users/user.repository.interface.js';
 import { PasswordService, passwordService as defaultPasswordService } from '../../common/security/password.service.js';
 import { JwtService, jwtService as defaultJwtService } from '../../common/security/jwt.service.js';
-import { ConflictError, UnauthorizedError } from '../../common/errors/app-error.js';
+import { ConflictError, UnauthorizedError, NotFoundError } from '../../common/errors/app-error.js';
 import type { RegisterInput, LoginInput } from './auth.dto.js';
 import type { User } from '@prisma/client';
 
@@ -97,5 +97,13 @@ export class AuthService {
       user: this.sanitizeUser(user),
       tokens: { accessToken, refreshToken },
     };
+  }
+
+  async getProfile(userId: string): Promise<UserWithoutPassword> {
+    const user = await this.userRepo.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+    return this.sanitizeUser(user);
   }
 }
