@@ -995,3 +995,21 @@
 * **CI Quality Gate**:
   * During the test run, tools like Vitest or Jest output an `lcov.info` report.
   * Automated bots (like Codecov) analyze the diff: if a pull request introduces new business logic without corresponding tests, or if overall repo coverage drops below a defined threshold (e.g. 80%), the status check fails (❌), blocking the pull request from merging.
+
+### Q96: What is the difference between Pure Unit Tests, Mocked Tests, and Real Integration Tests? What is "The Mock Trap"?
+* **The Spectrum of Automated Testing**:
+  1. **Pure Unit Tests (Zero Mocks)**:
+     * Tests self-contained pure functions (e.g. `PasswordService` Argon2id hashing, slug string sanitization).
+     * *Advantages*: Runs in pure CPU memory in < 0.001s with zero network, zero disk, and 0% flakiness.
+  2. **Mocked Unit Tests (`vi.fn()`, `vi.mock()`, `vi.spyOn()`)**:
+     * Isolates a business service (e.g. `ClubService` or `AuthService`) by substituting database repositories and Redis caches with fake in-memory imposters.
+     * *Advantages*: Can artificially simulate impossible production edge cases in 1 line (e.g. `mockRepo.create.mockRejectedValue(new Error('Connection Timeout'))`). Runs 5,000 tests in under 3 seconds in CI.
+  3. **Real Integration Tests (`supertest`, Live PostgreSQL, Live Redis)**:
+     * Fires real HTTP requests against Express and executes actual SQL queries on PostgreSQL and in-memory keys in Redis.
+     * *Advantages*: Tests real database foreign keys, cascade deletes, composite indexes (`userId_clubId`), and Prisma query syntax on disk.
+* **The "Mock Trap" (Why Mocks Can Give False Confidence)**:
+  * A mock only tests your *assumptions* about a dependency.
+  * If a developer introduces a schema typo in the real SQL query (`SELECT club_identifer FROM clubs`), the mocked unit test **still passes** because the mock blindly returns fake data without executing SQL.
+  * When deployed to production, PostgreSQL throws a syntax error and crashes!
+* **The Senior Testing Rule**:
+  * Never rely solely on mocks. Use **Mocked Unit Tests** to exhaustively test business rules, loops, and edge cases at high velocity. Use **Integration Tests** to verify that database drivers, migrations, transactions, and network protocols work on real hardware.
