@@ -771,3 +771,24 @@
 | **Instant Invalidation?** | Yes | **Yes (Immediate)** | **Yes (Global to all devices)** |
 | **Storage Growth** | High (Table bloat without cron) | **Zero (Self-evicting TTL)** | Negligible (1 integer per user) |
 | **Target Use Case** | Legacy monolithic apps | **Modern microservices & REST APIs** | **Password reset / Ban user** |
+
+### Q75: What is the Idempotency Key Pattern, and how does it prevent double charges / double registrations on network retries?
+* **The "At-Least-Once" Network Dilemma**:
+  * In mobile applications and distributed networks, client connections often drop after the server has processed a payment or database write, but before the HTTP response reaches the client.
+  * When the client retries the `POST` request, naive backends process the action again, causing **double charges** or duplicate ticket bookings.
+* **Mathematical Idempotency**:
+  * An operation is idempotent if $f(f(x)) = f(x)$ — executing it multiple times produces the exact same outcome as executing it once with zero additional side effects.
+  * While `GET`, `PUT`, and `DELETE` are naturally idempotent, `POST` is non-idempotent by default.
+* **The Redis Idempotency Architecture (RFC 9440 / Stripe Standard)**:
+  * The client passes a unique UUID in the header: `Idempotency-Key: <UUID>`.
+  * **1. Atomic Lock (`SET NX EX`)**:
+    * Server attempts: `SET idemp:<UUID> '{"status":"PROCESSING"}' NX EX 120`.
+    * If a concurrent retry arrives while status is `PROCESSING`, server rejects it with `409 Conflict` (`"Request currently being processed"`).
+  * **2. Execution & Response Caching**:
+    * Server completes the business operation and stores the final HTTP status code and response payload in Redis with a 24-hour TTL:  
+      `SET idemp:<UUID> '{"status":"COMPLETED","code":201,"body":{...}}' EX 86400`.
+  * **3. Transparent Replay**:
+    * Any subsequent retry within 24 hours hits the cache, bypassing the database and payment gateway entirely, instantly returning the cached response envelope.
+* **Payload Fingerprinting (Tampering Guard)**:
+  * To prevent attackers from reusing an `Idempotency-Key` for a completely different request, the server computes a SHA-256 hash of `Method + URL + Body` and stores it alongside the key.
+  * If an incoming key matches but the payload hash differs, the server rejects the request with `422 Unprocessable Entity` (`"Idempotency key payload mismatch"`).
