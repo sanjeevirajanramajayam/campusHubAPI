@@ -538,3 +538,28 @@
   * `readonly` guarantees that dependencies cannot be reassigned or mutated after instantiation.
 * **Default Fallback Parameters**:
   * Providing default values (e.g. `= defaultPasswordService`) enables clean, concise instantiations in production code while still allowing test runners to inject mocks effortlessly.
+
+### Q58: Won't a 7-day Refresh Token live forever if rotated continuously? (Sliding Sessions vs. Absolute Session Expiration)
+* **Sliding Window Lifespan (Rolling Expiration)**:
+  * In pure sliding sessions, each `/auth/refresh` resets the clock: `expiresAt = Now + 7 days`.
+  * *Advantage*: High user convenience for consumer apps (Instagram, Spotify, Discord); active users never get logged out.
+  * *Security Risk*: Forgotten public browser logins or stolen active token families can stay alive indefinitely.
+* **Absolute Session Lifetime (The Enterprise Standard)**:
+  * When a token family is born on Day 0, a hard ceiling is stamped: `absoluteExpiresAt = Day 0 + 30 days`.
+  * Every rotated token has an expiry of `min(Now + 7 days, absoluteExpiresAt)`.
+  * *The Result*: On Day 30, the ceiling is reached. The session terminates, requiring the user to enter their credentials again (standard practice in Banking, AWS, and University portals).
+
+### Q59: Won't the database be overwhelmed by Refresh Token Rotation, and how do we prevent Table Bloat?
+* **1. Why Database Write Load is Actually Very Low**:
+  * **Zero DB Queries for Access Tokens**: 99.9% of API calls use 15-minute stateless JWT Access Tokens verified entirely in CPU RAM with zero SQL lookups.
+  * **Refresh Tokens are Low-Frequency**: A user only hits `/auth/refresh` once every 15 minutes. Even with 50,000 active concurrent users, the database handles only:  
+    $$\frac{50,000 \text{ refreshes}}{15 \times 60 \text{ seconds}} \approx 55 \text{ writes/sec}$$  
+    PostgreSQL easily handles 3,000–5,000 writes/sec, consuming < 2% CPU.
+* **2. The Real Risk: Table Bloat (Zombie Token Accumulation)**:
+  * 50,000 users refreshing 4 times/hour generates **140,000,000 rows in one month** of old used/expired tokens, consuming gigabytes of disk space and degrading B-Tree index performance.
+* **3. Production Solutions for Table Bloat**:
+  * **PostgreSQL TTL Sweeper Cron**: An indexed background job runs periodically:  
+    `DELETE FROM refresh_tokens WHERE expires_at < NOW();`  
+    Quickly cleans dead rows using the `expiresAt` B-Tree index.
+  * **Immediate Predecessor Pruning**: Only store the current active token and its immediate predecessor (to catch replays); delete all older ancestors upon rotation.
+  * **Hyper-Scale Redis Session Store**: At massive scale (100k req/sec), store refresh tokens in Redis with native key expiration (`EXPIRE token:key 604800`). Redis automatically purges dead sessions from RAM with zero SQL queries and sub-millisecond lookups.
