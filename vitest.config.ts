@@ -13,6 +13,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    pool: 'forks',
+    forks: {
+      singleFork: true,
+    },
     fileParallelism: false,
     include: ['tests/**/*.test.ts'],
     coverage: {
