@@ -517,3 +517,24 @@
   * **Payment Gateway Redirects**: Banks and payment processors (PayPal, Stripe, PayU) redirect users back to your server via native HTML form POSTs.
   * **External Webhooks**: Many third-party communication providers (like Twilio SMS webhooks) send alerts formatted as urlencoded data.
   * **Progressive Enhancement**: HTML forms function natively even if client-side JavaScript bundles fail to load on poor mobile networks.
+
+### Q56: What is Node.js `EventEmitter`, and why do we use `res.on('finish', ...)` for HTTP request logging?
+* **Not a Keyword, but a Core Node.js Class**:
+  * `.on()` is a method on the `EventEmitter` class (analogous to the browser's `addEventListener()`).
+  * In Node.js, `http.ServerResponse` inherits from `stream.Writable`, which inherits from `EventEmitter`. Therefore, Express's `res` object is an active `EventEmitter`.
+* **The Problem with Synchronous Logging**:
+  * If you log at the beginning of a middleware, you do not know the HTTP `res.statusCode` yet (because controllers haven't run), nor do you know the total execution duration.
+* **The `'finish'` Event**:
+  * Emitted by the Node.js runtime when the last byte of the response body and headers has been flushed to the underlying operating system network socket.
+  * Registering `res.on('finish', callback)` allows the middleware to pass execution forward (`next()`), wait non-blockingly, and log the exact duration (`Date.now() - start`) and final `statusCode` once the HTTP response completes.
+
+### Q57: What is Constructor Dependency Injection (DI), and how do TypeScript Parameter Properties (`private readonly`) work?
+* **The Anti-Pattern (Hardcoded `new`)**:
+  * When a class creates its own dependencies (`this.repo = new PrismaUserRepository()`), it tightly couples itself to a concrete implementation. This makes unit testing impossible without live databases and violates the Dependency Inversion Principle (D of SOLID).
+* **Constructor Dependency Injection**:
+  * The class declares its requirements as parameters in its constructor. External code (the Composition Root) instantiates and injects those dependencies from the outside.
+* **TypeScript Parameter Properties**:
+  * Declaring an access modifier (`private`, `public`) and `readonly` directly in constructor arguments (e.g. `constructor(private readonly userRepo: IUserRepository) {}`) causes the TypeScript compiler to automatically declare the member variable and assign `this.userRepo = userRepo` without manual boilerplate.
+  * `readonly` guarantees that dependencies cannot be reassigned or mutated after instantiation.
+* **Default Fallback Parameters**:
+  * Providing default values (e.g. `= defaultPasswordService`) enables clean, concise instantiations in production code while still allowing test runners to inject mocks effortlessly.
