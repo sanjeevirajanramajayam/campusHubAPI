@@ -1013,3 +1013,15 @@
   * When deployed to production, PostgreSQL throws a syntax error and crashes!
 * **The Senior Testing Rule**:
   * Never rely solely on mocks. Use **Mocked Unit Tests** to exhaustively test business rules, loops, and edge cases at high velocity. Use **Integration Tests** to verify that database drivers, migrations, transactions, and network protocols work on real hardware.
+
+### Q97: What is `SELECT ... FOR UPDATE` in PostgreSQL, and how does it prevent ticket overselling race conditions?
+* **The TOCTOU (Time-of-Check to Time-of-Use) Hazard**:
+  * When two concurrent transactions read an event with 1 ticket remaining (`registeredCount: 49, maxCapacity: 50`), both threads evaluate `49 < 50` as true and insert a ticket, resulting in 51 tickets sold for a 50-person venue.
+* **The Physical Locking Mechanism**:
+  * Normally, `SELECT` queries in PostgreSQL are non-blocking read operations.
+  * Adding `FOR UPDATE` writes the current Transaction ID into the physical row tuple header (`xmax` field) on disk and sets the `HEAP_XMAX_EXCL_LOCK` infomask bit.
+* **Serialized Queue Execution**:
+  * Any competing transaction attempting to execute `SELECT ... FOR UPDATE`, `UPDATE`, or `DELETE` on that specific row is automatically suspended by the PostgreSQL kernel and placed in a wait queue.
+  * When Transaction 1 commits, Transaction 2 unpauses and reads the freshly committed row state (`registeredCount = 50`), safely rejecting the request with `409 Conflict (Event Sold Out)`.
+* **Prisma Implementation**:
+  * Prisma's ORM syntax lacks native row-locking clauses. Senior engineers execute `SELECT * FROM "events" WHERE "id" = $1::uuid FOR UPDATE` via `tx.$queryRaw` inside an interactive ACID transaction (`prisma.$transaction`).

@@ -25,12 +25,9 @@ describe('ClubService', () => {
       findAll: vi.fn(),
       createWithAdmin: vi.fn(),
       update: vi.fn(),
-      delete: vi.fn(),
       addMember: vi.fn(),
       getMembership: vi.fn(),
-      updateMemberRole: vi.fn(),
       removeMember: vi.fn(),
-      countMembersByRole: vi.fn(),
     };
 
     clubService = new ClubService(mockClubRepo);

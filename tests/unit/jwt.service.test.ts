@@ -23,8 +23,13 @@ describe('JwtService', () => {
   });
 
   it('should generate a refresh token with unique jti', () => {
-    const token1 = jwtService.generateRefreshToken({ userId: mockPayload.userId });
-    const token2 = jwtService.generateRefreshToken({ userId: mockPayload.userId });
+    const refreshPayload = {
+      userId: mockPayload.userId,
+      tokenFamilyId: 'family-uuid-1234',
+    };
+
+    const token1 = jwtService.generateRefreshToken(refreshPayload);
+    const token2 = jwtService.generateRefreshToken(refreshPayload);
 
     expect(token1).toBeDefined();
     expect(token2).toBeDefined();
@@ -33,6 +38,7 @@ describe('JwtService', () => {
 
     const decoded = jwtService.verifyRefreshToken(token1);
     expect(decoded.userId).toBe(mockPayload.userId);
+    expect(decoded.tokenFamilyId).toBe(refreshPayload.tokenFamilyId);
   });
 
   it('should throw UnauthorizedError when verifying a tampered token', () => {

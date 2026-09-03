@@ -38,6 +38,28 @@ export const errorHandler: ErrorRequestHandler = (
     return;
   }
 
+  // Handle Express/BodyParser standard HTTP errors (e.g. 413 Payload Too Large, 400 Bad JSON)
+  const clientStatus =
+    (err as { status?: number; statusCode?: number }).status ??
+    (err as { status?: number; statusCode?: number }).statusCode;
+
+  if (typeof clientStatus === 'number' && clientStatus >= 400 && clientStatus < 500) {
+    logger.warn({
+      statusCode: clientStatus,
+      message: err.message,
+    });
+
+    res.status(clientStatus).json({
+      success: false,
+      error: {
+        code: clientStatus === 413 ? 'PAYLOAD_TOO_LARGE' : 'BAD_REQUEST',
+        message: err.message,
+        details: null,
+      },
+    });
+    return;
+  }
+
   // Unexpected programmer bugs / unhandled exceptions (500)
   logger.error(err, 'Unhandled Application Error');
 

@@ -44,12 +44,12 @@ describe('Validate Middleware', () => {
     } as Request;
 
     const res = {} as Response;
-    const next = vi.fn() as NextFunction;
+    const next = vi.fn();
 
     await middleware(req, res, next);
 
     expect(next).toHaveBeenCalledTimes(1);
-    const errorArg = vi.mocked(next).mock.calls[0][0];
+    const errorArg = next.mock.calls[0][0];
 
     expect(errorArg).toBeInstanceOf(ValidationError);
     const validationError = errorArg as ValidationError;

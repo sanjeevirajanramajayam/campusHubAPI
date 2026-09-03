@@ -18,8 +18,8 @@ describe('Idempotency Middleware', () => {
 
   it('should ignore non-mutating requests (e.g. GET) and call next()', async () => {
     const middleware = idempotency();
-    const req = { method: 'GET', headers: { 'idempotency-key': 'key-1' } } as Request;
-    const res = {} as Response;
+    const req = { method: 'GET', headers: { 'idempotency-key': 'key-1' } } as unknown as Request;
+    const res = {} as unknown as Response;
     const next = vi.fn() as NextFunction;
 
     await middleware(req, res, next);
@@ -30,8 +30,8 @@ describe('Idempotency Middleware', () => {
 
   it('should call next() if no Idempotency-Key header is provided on POST', async () => {
     const middleware = idempotency();
-    const req = { method: 'POST', headers: {} } as Request;
-    const res = {} as Response;
+    const req = { method: 'POST', headers: {} } as unknown as Request;
+    const res = {} as unknown as Response;
     const next = vi.fn() as NextFunction;
 
     await middleware(req, res, next);
@@ -47,8 +47,8 @@ describe('Idempotency Middleware', () => {
       originalUrl: '/api/v1/clubs',
       headers: { 'idempotency-key': 'key-1' },
       body: { name: 'AI Society' },
-    } as Request;
-    const res = {} as Response;
+    } as unknown as Request;
+    const res = {} as unknown as Response;
     const next = vi.fn() as NextFunction;
 
     // Simulate an existing in-flight lock in Redis
@@ -72,7 +72,7 @@ describe('Idempotency Middleware', () => {
       originalUrl: '/api/v1/clubs',
       headers: { 'idempotency-key': 'key-123' },
       body: payload,
-    } as Request;
+    } as unknown as Request;
 
     const res = {
       setHeader: vi.fn(),

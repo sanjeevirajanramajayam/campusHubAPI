@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { User } from '@prisma/client';
 import { AuthService } from '../../src/modules/auth/auth.service.js';
 import type { IUserRepository } from '../../src/modules/users/user.repository.interface.js';
 import type { IRefreshTokenRepository } from '../../src/modules/auth/refresh-token.repository.interface.js';
@@ -13,12 +14,16 @@ describe('AuthService', () => {
   let mockPasswordService: PasswordService;
   let mockJwtService: JwtService;
 
-  const mockUser = {
+  const mockUser: User = {
     id: 'user-uuid-1',
-    name: 'Alex Chen',
+    firstName: 'Alex',
+    lastName: 'Chen',
     email: 'alex@stanford.edu',
     passwordHash: '$argon2id$hashedpassword',
-    role: 'STUDENT' as const,
+    avatarUrl: null,
+    bio: null,
+    role: 'STUDENT',
+    isVerified: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -28,15 +33,17 @@ describe('AuthService', () => {
       create: vi.fn(),
       findByEmail: vi.fn(),
       findById: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     };
 
     mockTokenRepo = {
       create: vi.fn(),
       findByTokenHash: vi.fn(),
       markAsUsed: vi.fn(),
-      update: vi.fn(),
       revokeFamily: vi.fn(),
       deleteByTokenHash: vi.fn(),
+      deleteAllForUser: vi.fn(),
     };
 
     mockPasswordService = {
@@ -65,7 +72,8 @@ describe('AuthService', () => {
 
       await expect(
         authService.register({
-          name: 'Alex Chen',
+          firstName: 'Alex',
+          lastName: 'Chen',
           email: 'alex@stanford.edu',
           password: 'Password123!',
         }),
@@ -79,7 +87,8 @@ describe('AuthService', () => {
       vi.mocked(mockUserRepo.create).mockResolvedValue(mockUser);
 
       const result = await authService.register({
-        name: 'Alex Chen',
+        firstName: 'Alex',
+        lastName: 'Chen',
         email: 'alex@stanford.edu',
         password: 'Password123!',
       });
@@ -140,7 +149,6 @@ describe('AuthService', () => {
         userId: 'user-uuid-1',
         familyId: 'family-abc',
         isUsed: true, // 🚨 ALREADY USED!
-        isRevoked: false,
         expiresAt: new Date(Date.now() + 100000),
         createdAt: new Date(),
       });
@@ -157,7 +165,6 @@ describe('AuthService', () => {
         userId: 'user-uuid-1',
         familyId: 'family-abc',
         isUsed: false,
-        isRevoked: false,
         expiresAt: new Date(Date.now() + 100000),
         createdAt: new Date(),
       });

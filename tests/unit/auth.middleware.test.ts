@@ -25,8 +25,8 @@ describe('Auth Middleware', () => {
       const req = {
         headers: { authorization: 'Bearer blacklisted-token-123' },
       } as Request;
+      const next = vi.fn();
       const res = {} as Response;
-      const next = vi.fn() as NextFunction;
 
       vi.spyOn(jwtService, 'verifyAccessToken').mockReturnValue({
         userId: 'user-1',
@@ -38,7 +38,7 @@ describe('Auth Middleware', () => {
       await authenticate(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
-      const error = vi.mocked(next).mock.calls[0][0] as UnauthorizedError;
+      const error = next.mock.calls[0][0] as UnauthorizedError;
       expect(error.message).toContain('revoked');
     });
 
@@ -69,7 +69,7 @@ describe('Auth Middleware', () => {
 
   describe('requireRole', () => {
     it('should call next() when user has one of the allowed roles', () => {
-      const middleware = requireRole('ADMIN', 'CLUB_LEADER');
+      const middleware = requireRole('ADMIN', 'CLUB_ADMIN');
 
       const req = {
         user: { id: 'u1', email: 'a@a.com', role: 'ADMIN' },

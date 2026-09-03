@@ -10,6 +10,7 @@ import { NotFoundError } from './common/errors/app-error.js';
 import cookieParser from 'cookie-parser';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createClubRouter } from './modules/clubs/club.routes.js';
+import { createEventRouter, createClubEventRouter } from './modules/events/event.routes.js';
 
 export const createApp = (): Application => {
   const app = express();
@@ -76,6 +77,12 @@ export const createApp = (): Application => {
 
   // Mount Club Module
   apiRouter.use('/clubs', createClubRouter());
+
+  // Mount Nested Club Events Module
+  apiRouter.use('/clubs/:clubId/events', createClubEventRouter());
+
+  // Mount Global Events & Ticketing Module
+  apiRouter.use('/events', createEventRouter());
 
   // Mount API Router under configured prefix (e.g. /api/v1)
   app.use(env.API_PREFIX, apiRouter);

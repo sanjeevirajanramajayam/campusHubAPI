@@ -26,7 +26,12 @@ describe('TokenBlacklistService', () => {
     await blacklistService.blacklistToken(token);
 
     expect(redis.set).toHaveBeenCalledTimes(1);
-    const [key, value, mode, ttl] = vi.mocked(redis.set).mock.calls[0] as [string, string, string, number];
+    const [key, value, mode, ttl] = vi.mocked(redis.set).mock.calls[0] as unknown as [
+      string,
+      string,
+      string,
+      number,
+    ];
 
     expect(key).toMatch(/^bl:[a-f0-9]{64}$/); // SHA-256 hash prefix
     expect(value).toBe('revoked');
