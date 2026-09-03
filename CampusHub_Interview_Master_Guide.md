@@ -865,3 +865,22 @@
   * **Dependency Caching (`actions/setup-node with cache: 'pnpm'`)**: Saves downloaded package tarballs between workflow runs, cutting CI time from 3 minutes to 25 seconds.
   * **Concurrency Cancellation (`cancel-in-progress: true`)**: If a developer pushes 3 commits in rapid succession, GitHub Actions automatically aborts stale in-progress runs, saving runner minutes and cloud compute costs.
   * **Docker Buildx Cache (`cache-from/to: type=gha`)**: Shares Docker build layers across CI runs so unchanged stages don't re-execute.
+
+### Q82: What does GitHub Actions `concurrency` with `cancel-in-progress: true` accomplish?
+* **The Rapid-Commit Problem**:
+  * When developers push multiple commits in quick succession (e.g. fixing typos or amending a pull request), CI runners spin up in parallel for each commit, creating queue congestion and consuming billing minutes on obsolete code revisions.
+* **The `concurrency` Group**:
+  * `group: ${{ github.workflow }}-${{ github.ref }}` groups workflow executions by the workflow name and target branch name (e.g. `CI-refs/heads/feature-auth`).
+* **`cancel-in-progress: true`**:
+  * Instructs the GitHub Actions runner engine to immediately terminate any running CI jobs belonging to older commits on that branch the millisecond a newer commit arrives, ensuring compute resources are spent strictly on the latest revision.
+
+### Q83: How does CI Package Caching (`cache: 'pnpm'`) work, and what happens when a step fails?
+* **The Blank VM Problem**:
+  * CI runners execute on ephemeral, clean virtual machines with empty disk storage. Without caching, `pnpm install` must download hundreds of megabytes of tarball archives over the public internet on every push (taking 2–3 minutes).
+* **Cryptographic Cache Keying**:
+  * `actions/setup-node with cache: 'pnpm'` computes a SHA-256 hash of `pnpm-lock.yaml`.
+  * If the hash matches a previous build, GitHub restores the entire `~/.pnpm-store` directory from its high-speed SSD cache in ~2 seconds, reducing dependency installation to near-zero time.
+* **Fail-Fast Mechanics on Errors**:
+  * Every pipeline command produces a POSIX exit code (`0` for success, non-zero for failure).
+  * If a step like `pnpm typecheck` fails (Exit Code 1), GitHub Actions immediately aborts the job, skipping all downstream steps (e.g. `pnpm build`) and dependent jobs (`docker-build`).
+  * The Pull Request is marked with a failing check (❌), and branch protection rules prevent merging broken code into `main`.
