@@ -884,3 +884,21 @@
   * Every pipeline command produces a POSIX exit code (`0` for success, non-zero for failure).
   * If a step like `pnpm typecheck` fails (Exit Code 1), GitHub Actions immediately aborts the job, skipping all downstream steps (e.g. `pnpm build`) and dependent jobs (`docker-build`).
   * The Pull Request is marked with a failing check (❌), and branch protection rules prevent merging broken code into `main`.
+
+### Q84: What is Infrastructure as Code (IaC) via PaaS Blueprints (`render.yaml`), and why is "ClickOps" an anti-pattern?
+* **The Anti-Pattern of "ClickOps"**:
+  * Manually clicking around cloud web consoles (AWS, Render, GCP) to configure database passwords, environment variables, and ports is error-prone, non-reproducible, and lacks version history. If an environment crashes, recreating it is slow and manual.
+* **Declarative Blueprints (`render.yaml` / Terraform)**:
+  * Declares the entire infrastructure (Compute Web Service + Managed PostgreSQL + Redis + Environment Variables) as a version-controlled YAML file inside the Git repository.
+  * *Benefits*:
+    1. **Reproducibility**: Spinning up a Staging or Production environment takes 1 click.
+    2. **Auditability**: Every change to environment variables or CPU sizing is tracked via Git commits.
+    3. **Automated Secret Generation**: `generateValue: true` instructs the platform to generate cryptographically strong 256-bit secrets without committing passwords into Git.
+
+### Q85: How do automated database migrations execute safely during Continuous Deployment (`prisma migrate deploy`)?
+* **`prisma migrate dev` vs. `prisma migrate deploy`**:
+  * `prisma migrate dev`: Used strictly in local development. Interactively creates new `.sql` migration files, checks for schema drift, and prompts for confirmation if data loss might occur.
+  * `prisma migrate deploy`: Used in automated CD pipelines. Non-interactive, applies only pending unapplied migration files in sequential order, and immediately terminates with a non-zero exit code if any migration fails.
+* **The `preDeployCommand` Lifecycle**:
+  * In modern PaaS engines (Render, Railway, Kubernetes init-containers), migrations run in a **pre-deploy step** *before* the new application container is routed user traffic.
+  * If a migration fails (e.g. invalid SQL constraint or DB connection failure), deployment aborts immediately, and existing user traffic remains safely on the older, healthy container version with zero downtime.
