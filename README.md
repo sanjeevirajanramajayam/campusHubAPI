@@ -17,7 +17,21 @@ Enterprise-grade Campus Community & Event Ticketing Backend built with Node.js, 
 * **Authentication & RBAC**: Dual-token authentication (Access JWT + Refresh Token Rotation with automatic token-family reuse revocation detection).
 * **High-Performance Cryptography**: RFC 9106 Argon2id password hashing powered by Rust N-API (`@node-rs/argon2`).
 * **Distributed Locking & Caching**: Redis-backed idempotent request middleware, token revocation blacklist, and rate-limiting.
+* **Interactive API Documentation**: Automated OpenAPI 3.0.3 documentation rendered with custom dark-themed Swagger UI at `/docs` and raw schema export at `/docs/openapi.json`.
 * **Gated CI/CD Pipeline**: 3-job automated pipeline enforcing Prettier, ESLint, TypeScript Typechecking, PostgreSQL/Redis service containers, and Vitest V8 code coverage before triggering zero-downtime production deployment.
+
+---
+
+## 📖 Interactive API Documentation (OpenAPI 3.0)
+
+When running locally or in production, navigate to:
+* **Interactive Swagger UI**: [http://localhost:5000/docs](http://localhost:5000/docs)
+* **Raw OpenAPI 3.0 Specification**: [http://localhost:5000/docs/openapi.json](http://localhost:5000/docs/openapi.json)
+
+Features:
+* **Authorize Button**: Built-in Bearer JWT & Cookie token persistence (`persistAuthorization: true`).
+* **RFC 9440 Idempotency**: Header documentation for safe payment/ticket booking retries.
+* **Interactive Requests**: "Try it out" directly against live endpoints.
 
 ---
 

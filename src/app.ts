@@ -8,6 +8,8 @@ import { idempotency } from './middleware/idempotency.middleware.js';
 import { NotFoundError } from './common/errors/app-error.js';
 
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec, swaggerUiOptions } from './infrastructure/docs/swagger.config.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createClubRouter } from './modules/clubs/club.routes.js';
 import { createEventRouter, createClubEventRouter } from './modules/events/event.routes.js';
@@ -15,8 +17,24 @@ import { createEventRouter, createClubEventRouter } from './modules/events/event
 export const createApp = (): Application => {
   const app = express();
 
-  // 1. Security HTTP Headers
-  app.use(helmet());
+  // 1. Security HTTP Headers with Swagger UI CSP support
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          'script-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+          'style-src': [
+            "'self'",
+            "'unsafe-inline'",
+            'https://cdnjs.cloudflare.com',
+            'https://fonts.googleapis.com',
+          ],
+          'img-src': ["'self'", 'data:', 'https://validator.swagger.io'],
+        },
+      },
+    }),
+  );
 
   // 2. Cross-Origin Resource Sharing
   app.use(
@@ -87,12 +105,19 @@ export const createApp = (): Application => {
   // Mount API Router under configured prefix (e.g. /api/v1)
   app.use(env.API_PREFIX, apiRouter);
 
-  // 7. 404 Handler for undefined routes
+  // 7. Interactive API Documentation (OpenAPI 3.0 & Swagger UI)
+  app.get('/docs/openapi.json', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.status(200).json(swaggerSpec);
+  });
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
+
+  // 8. 404 Handler for undefined routes
   app.use((req: Request) => {
     throw new NotFoundError(`Route ${req.method} ${req.originalUrl} not found`);
   });
 
-  // 8. Global Centralized Error Handler (must be last middleware)
+  // 9. Global Centralized Error Handler (must be last middleware)
   app.use(errorHandler);
 
   return app;

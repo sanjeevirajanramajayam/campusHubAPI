@@ -1089,4 +1089,26 @@
   * Every log entry emitted throughout the request lifecycle (controllers, services, repositories) automatically includes that `requestId`.
   * Engineers can filter by `requestId` in log dashboards to instantly trace a single user's request journey across microservices with zero confusion.
 
-
+### Q102: How do you implement Automated API Documentation with OpenAPI 3.0 in an Enterprise Express/TypeScript Backend, and how do you resolve Content Security Policy (CSP) conflicts with Helmet?
+* **Why Contract-First OpenAPI 3.0 Matters in Enterprise**:
+  * **Single Source of Truth**: Serves as the authoritative API contract between backend, frontend (web/mobile), QA, and external integration partners.
+  * **Client SDK & Type Generation**: External teams can automatically generate typed TypeScript/Swift/Kotlin client SDKs using OpenAPI generators (`openapi-typescript-codegen`) directly from our `/docs/openapi.json` endpoint without writing manual HTTP wrappers.
+  * **Zero Documentation Drift**: Documenting parameters, RFC 9440 `Idempotency-Key` headers, and Zod DTO request/response schemas prevents outdated wiki docs.
+* **The Helmet CSP (Content Security Policy) Conflict & Resolution**:
+  * **The Conflict**: By default, `helmet()` injects strict HTTP headers including `Content-Security-Policy: default-src 'self'`. Swagger UI relies on inline scripts, Google Fonts, and cdnjs stylesheets to render its interactive sandbox. If Helmet is left at default settings, loading `/docs` results in a blank page and browser console CSP violation errors (`Refused to execute inline script because it violates CSP directive`).
+  * **The Resolution**: We configure Helmet's CSP directives specifically to allow trusted Swagger UI assets:
+    ```typescript
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          'script-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
+          'style-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://fonts.googleapis.com'],
+          'img-src': ["'self'", 'data:', 'https://validator.swagger.io'],
+        },
+      },
+    })
+    ```
+* **Security & Auth Integration**:
+  * Configure `components.securitySchemes` with `bearerAuth` (HTTP Bearer JWT) and `cookieAuth` (HTTP-Only refresh cookies).
+  * Enable `persistAuthorization: true` in Swagger UI options so developers do not have to re-enter their JWT access token on page refresh when testing protected endpoints.
