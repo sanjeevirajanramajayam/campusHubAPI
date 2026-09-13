@@ -32,6 +32,9 @@ This handbook is our definitive project reference document. It breaks down every
 
 CampusHub is a production-grade college community platform designed to facilitate student interactions, campus clubs, events, project collaborations, and communication.
 
+> 📋 **Product Requirements & Business Logic Reference**:  
+> For the complete breakdown of domain personas, user stories with Gherkin acceptance criteria, and 30+ enterprise business rules/invariants, see [CampusHub User Stories & Business Rules](CampusHub_User_Stories_and_Business_Rules.md).
+
 ### Core Domain Entities
 - **User / Student / Faculty / Admin**: Platform actors with specific roles, verification statuses, and academic metadata.
 - **Club**: Student organizations with member rosters, leadership hierarchies (Club Admin), and moderation needs.

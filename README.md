@@ -62,3 +62,13 @@ Automated via GitHub Actions with Render Webhook Deploy Hook:
 * **Quality Check**: Dependency audit, linting, typecheck, database migration, and test coverage.
 * **Docker Build**: Verifies production multi-stage container build with layer caching.
 * **Production Deploy**: Automatically triggers zero-downtime Render deployment only when 100% of checks pass.
+
+---
+
+## 📚 Documentation & Specifications
+
+* 📋 [User Stories & Business Rules Specification](CampusHub_User_Stories_and_Business_Rules.md) — Comprehensive product requirements, Gherkin acceptance criteria, RBAC matrix, and domain invariants.
+* 📘 [Engineering Handbook & Architectural Guide](CampusHub_Engineering_Handbook.md) — In-depth architectural design, SOLID patterns, data modeling, and performance strategies.
+* 🎯 [Interview Master Guide (102 Codified Architecture Questions)](CampusHub_Interview_Master_Guide.md) — Deep-dive system design and backend engineering interview questions based on CampusHub's codebase.
+* 📮 [Postman API Collection](CampusHub_Postman_Collection.json) — Ready-to-import HTTP request collection for testing local and deployed endpoints.
+
