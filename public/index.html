@@ -35,14 +35,28 @@
     <!-- Dynamic club chips injected here -->
   </nav>
 
-  <!-- HERO TITLE -->
+  <!-- HERO TITLE & MODULE NAVIGATION -->
   <div class="hero-strip">
-    <h1 class="logo-title">CAMPUS BULLETIN // BOARD</h1>
-    <p class="logo-sub">TACTICAL COMMUNITY FEED &bull; THREADED DISCUSSIONS &bull; ZERO FLUFF</p>
+    <div class="hero-titles">
+      <h1 class="logo-title">CAMPUS BULLETIN // BOARD</h1>
+      <p class="logo-sub">TACTICAL COMMUNITY FEED &bull; CLUB DIRECTORY &bull; HIGH-CONCURRENCY TICKETING</p>
+    </div>
+    <!-- TOP LEVEL MODULE TABS -->
+    <nav class="module-nav-bar" id="module-nav">
+      <button class="module-tab-btn active" data-view="feed" id="tab-btn-feed">
+        [ 01: BULLETIN FEED ]
+      </button>
+      <button class="module-tab-btn" data-view="clubs" id="tab-btn-clubs">
+        [ 02: CLUBS DIRECTORY ]
+      </button>
+      <button class="module-tab-btn" data-view="events" id="tab-btn-events">
+        [ 03: CAMPUS EVENTS &amp; TICKETS ]
+      </button>
+    </nav>
   </div>
 
-  <!-- MAIN TWO-COLUMN CONTAINER -->
-  <main class="main-layout">
+  <!-- VIEW 1: BULLETIN FEED (POSTS & THREADED COMMENTS) -->
+  <main class="main-layout app-view active" id="view-feed">
     <!-- LEFT COLUMN: POST FEED & COMMENTS -->
     <section class="feed-section">
       <!-- FEED CONTROLS & FILTER -->
@@ -82,13 +96,11 @@
       <div class="brutal-card auth-card" id="auth-box">
         <div class="card-header">[ OPERATOR AUTHENTICATION ]</div>
         <div class="card-body" id="auth-card-body">
-          <!-- Auth tabs: Login / Register -->
           <div class="auth-tabs">
             <button id="tab-login" class="tab-btn active">LOGIN</button>
             <button id="tab-register" class="tab-btn">REGISTER</button>
           </div>
 
-          <!-- Login Form -->
           <form id="login-form" class="auth-form">
             <label class="form-label">EMAIL</label>
             <input type="email" id="login-email" class="brutal-input" placeholder="user@campus.edu" required />
@@ -97,7 +109,6 @@
             <button type="submit" class="brutal-btn full red-btn">[ AUTHENTICATE ]</button>
           </form>
 
-          <!-- Register Form -->
           <form id="register-form" class="auth-form" style="display: none;">
             <label class="form-label">FIRST NAME</label>
             <input type="text" id="reg-first-name" class="brutal-input" placeholder="Alex" required />
@@ -110,7 +121,6 @@
             <button type="submit" class="brutal-btn full">[ CREATE ACCOUNT ]</button>
           </form>
 
-          <!-- Status Message -->
           <div id="auth-status" class="auth-status" style="display: none;"></div>
         </div>
       </div>
@@ -120,7 +130,7 @@
         + SUBMIT NEW POST
       </button>
 
-      <!-- CLUBS DIRECTORY -->
+      <!-- CLUBS DIRECTORY SIDEBAR -->
       <div class="brutal-card">
         <div class="card-header">[ CAMPUS CHANNELS ]</div>
         <div class="card-body">
@@ -149,6 +159,104 @@
           <div class="rule-row">
             <span class="rule-code">BR-COMM-004</span>
             <span class="rule-desc">Deleted posts become preserved tombstones.</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- VIEW 2: CLUBS DIRECTORY -->
+  <main class="main-layout app-view" id="view-clubs" style="display: none;">
+    <section class="feed-section">
+      <div class="section-top-bar">
+        <div class="section-title-wrap">
+          <h2 class="section-heading">[ CAMPUS CHAPTERS &amp; CLUBS ]</h2>
+          <span class="sub-counter" id="clubs-total-counter">LOADING DIRECTORY...</span>
+        </div>
+        <button id="btn-open-club-modal" class="brutal-btn red-btn">
+          + REGISTER NEW CLUB
+        </button>
+      </div>
+
+      <div id="clubs-directory-grid" class="cards-grid">
+        <div class="loading-box">[ QUERYING CLUBS DIRECTORY... ]</div>
+      </div>
+    </section>
+
+    <aside class="sidebar-section">
+      <div class="brutal-card">
+        <div class="card-header">[ CLUB ARCHITECTURE &amp; RULES ]</div>
+        <div class="card-body rules-body">
+          <div class="rule-row">
+            <span class="rule-code">BR-CLUB-001</span>
+            <span class="rule-desc">Creating a club assigns founder as ADMIN in ACID transaction.</span>
+          </div>
+          <div class="rule-row">
+            <span class="rule-code">BR-CLUB-002</span>
+            <span class="rule-desc">Club ADMIN or LEAD required to schedule campus events.</span>
+          </div>
+          <div class="rule-row">
+            <span class="rule-code">BR-CLUB-003</span>
+            <span class="rule-desc">Sole ADMIN cannot leave club without transferring ownership.</span>
+          </div>
+          <div class="rule-row">
+            <span class="rule-code">BR-CLUB-004</span>
+            <span class="rule-desc">URL-safe slugs automatically generated from club names.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="brutal-card" id="user-clubs-summary-card">
+        <div class="card-header">[ MY CLUB MEMBERSHIPS ]</div>
+        <div class="card-body" id="user-clubs-summary-body">
+          <p class="telemetry-mono text-muted">Sign in to view joined clubs.</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- VIEW 3: EVENTS & TICKET WALLET -->
+  <main class="main-layout app-view" id="view-events" style="display: none;">
+    <section class="feed-section">
+      <div class="section-top-bar">
+        <div class="section-title-wrap">
+          <h2 class="section-heading">[ CAMPUS EVENTS &amp; HIGH-CONCURRENCY TICKETING ]</h2>
+          <span class="sub-counter" id="events-total-counter">LOADING EVENTS...</span>
+        </div>
+        <button id="btn-open-event-modal" class="brutal-btn red-btn">
+          + SCHEDULE EVENT
+        </button>
+      </div>
+
+      <div id="events-directory-grid" class="cards-grid">
+        <div class="loading-box">[ QUERYING CAMPUS EVENTS... ]</div>
+      </div>
+    </section>
+
+    <aside class="sidebar-section">
+      <!-- TICKET WALLET -->
+      <div class="brutal-card wallet-card">
+        <div class="card-header highlight">[ MY TICKET WALLET (PASSES) ]</div>
+        <div class="card-body" id="ticket-wallet-list">
+          <div class="empty-wallet">[ NO TICKETS ISSUED YET. CLAIM AN RSVP FROM THE SCHEDULE. ]</div>
+        </div>
+      </div>
+
+      <!-- CONCURRENCY SPEC -->
+      <div class="brutal-card rules-card">
+        <div class="card-header">[ CONCURRENCY &amp; LOCKING SPEC ]</div>
+        <div class="card-body rules-body">
+          <div class="rule-row">
+            <span class="rule-code">RFC-LOCK-01</span>
+            <span class="rule-desc">Pessimistic row locking (SELECT ... FOR UPDATE) prevents seat overbooking.</span>
+          </div>
+          <div class="rule-row">
+            <span class="rule-code">RFC-LOCK-02</span>
+            <span class="rule-desc">Ticket codes cryptographically generated (TICK-XXXXXXXX).</span>
+          </div>
+          <div class="rule-row">
+            <span class="rule-code">RFC-LOCK-03</span>
+            <span class="rule-desc">Duplicate registrations rejected with 409 Conflict.</span>
           </div>
         </div>
       </div>
@@ -205,6 +313,75 @@
         <div class="modal-footer">
           <button type="button" id="cancel-edit-btn" class="brutal-btn">[ CANCEL ]</button>
           <button type="submit" class="brutal-btn red-btn">[ COMMIT EDIT ]</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE CLUB -->
+  <div id="club-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box brutal-modal">
+      <div class="modal-header">
+        <span>[ REGISTER NEW CAMPUS CLUB ]</span>
+        <button id="close-club-modal-btn" class="close-btn">&times;</button>
+      </div>
+      <form id="create-club-form" class="modal-body">
+        <label class="form-label">CLUB / CHAPTER NAME (MIN 3 CHARS)</label>
+        <input type="text" id="new-club-name" class="brutal-input" placeholder="e.g. Distributed Systems Club" required minlength="3" maxlength="60" />
+
+        <label class="form-label">MISSION &amp; DESCRIPTION (MIN 10 CHARS)</label>
+        <textarea id="new-club-description" class="brutal-textarea" rows="4" placeholder="Describe the mission, activities, and purpose..." required minlength="10" maxlength="1000"></textarea>
+
+        <label class="form-label">BANNER IMAGE URL (OPTIONAL)</label>
+        <input type="url" id="new-club-banner" class="brutal-input" placeholder="https://example.com/banner.png" />
+
+        <div class="modal-footer">
+          <button type="button" id="cancel-club-btn" class="brutal-btn">[ CANCEL ]</button>
+          <button type="submit" id="submit-club-btn" class="brutal-btn red-btn">[ CHARTER CLUB ]</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE EVENT -->
+  <div id="event-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box brutal-modal">
+      <div class="modal-header">
+        <span>[ SCHEDULE CAMPUS EVENT ]</span>
+        <button id="close-event-modal-btn" class="close-btn">&times;</button>
+      </div>
+      <form id="create-event-form" class="modal-body">
+        <label class="form-label">HOSTING CLUB</label>
+        <select id="new-event-club" class="brutal-select" required>
+          <option value="">-- SELECT HOSTING CLUB --</option>
+        </select>
+
+        <label class="form-label">EVENT TITLE</label>
+        <input type="text" id="new-event-title" class="brutal-input" placeholder="e.g. High-Throughput Microservices Workshop" required minlength="3" maxlength="100" />
+
+        <label class="form-label">CAMPUS LOCATION / ROOM</label>
+        <input type="text" id="new-event-location" class="brutal-input" placeholder="e.g. Turing Auditorium, Room 404" required minlength="2" />
+
+        <div class="form-row-2">
+          <div>
+            <label class="form-label">START TIME (ISO / DATE)</label>
+            <input type="datetime-local" id="new-event-start" class="brutal-input" required />
+          </div>
+          <div>
+            <label class="form-label">END TIME (ISO / DATE)</label>
+            <input type="datetime-local" id="new-event-end" class="brutal-input" required />
+          </div>
+        </div>
+
+        <label class="form-label">SEAT CAPACITY (CONCURRENCY LOCK LIMIT)</label>
+        <input type="number" id="new-event-capacity" class="brutal-input" placeholder="100" min="1" max="10000" value="100" required />
+
+        <label class="form-label">EVENT DETAILS &amp; AGENDA</label>
+        <textarea id="new-event-description" class="brutal-textarea" rows="4" placeholder="Outline agenda, prerequisites, and speaker details..." required minlength="10"></textarea>
+
+        <div class="modal-footer">
+          <button type="button" id="cancel-event-btn" class="brutal-btn">[ CANCEL ]</button>
+          <button type="submit" id="submit-event-btn" class="brutal-btn red-btn">[ BROADCAST EVENT ]</button>
         </div>
       </form>
     </div>

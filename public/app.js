@@ -18,6 +18,10 @@ const state = {
   clubs: [],
   posts: [],
   expandedPostId: null, // ID of post with open comment drawer
+  currentView: 'feed',
+  events: [],
+  userTickets: JSON.parse(localStorage.getItem('campushub_user_tickets') || '[]'),
+  userMemberships: new Set(),
 };
 
 // ============================================================================
@@ -854,15 +858,22 @@ function loginSuccess(data) {
   localStorage.setItem('campushub_user', JSON.stringify(state.user));
 
   renderAuthCard();
+  renderUserAffiliations();
+  if (state.currentView === 'clubs') loadClubsDirectory();
+  if (state.currentView === 'events') loadEventsDirectory();
   loadPosts(); // Reload feed to hydrate `hasLiked`
 }
 
 function logout() {
   state.token = null;
   state.user = null;
+  state.userMemberships.clear();
   localStorage.removeItem('campushub_token');
   localStorage.removeItem('campushub_user');
   renderAuthCard();
+  renderUserAffiliations();
+  if (state.currentView === 'clubs') renderClubsDirectory();
+  if (state.currentView === 'events') renderEventsDirectory();
   loadPosts();
 }
 
@@ -887,6 +898,346 @@ function renderPagination() {
 }
 
 // ============================================================================
+// 10A. VIEW SWITCHING & MODULE ROUTING
+// ============================================================================
+function switchView(viewName) {
+  state.currentView = viewName;
+
+  document.querySelectorAll('.module-tab-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.view === viewName);
+  });
+
+  const views = ['feed', 'clubs', 'events'];
+  views.forEach((v) => {
+    const el = document.getElementById(`view-${v}`);
+    if (el) {
+      el.style.display = v === viewName ? 'grid' : 'none';
+    }
+  });
+
+  if (viewName === 'clubs') {
+    loadClubsDirectory();
+  } else if (viewName === 'events') {
+    loadEventsDirectory();
+    renderTicketWallet();
+  } else if (viewName === 'feed') {
+    loadPosts();
+  }
+}
+
+// ============================================================================
+// 10B. CLUBS DIRECTORY & MEMBERSHIPS
+// ============================================================================
+async function loadClubsDirectory() {
+  const container = document.getElementById('clubs-directory-grid');
+  const counter = document.getElementById('clubs-total-counter');
+  if (!container) return;
+
+  try {
+    container.innerHTML = '<div class="loading-box">[ QUERYING CLUBS DIRECTORY... ]</div>';
+    const res = await apiRequest('/clubs');
+    state.clubs = res.data.clubs || res.data || [];
+    if (counter) counter.textContent = `[ ${state.clubs.length} CHARTERED CHAPTERS ]`;
+
+    renderClubsDirectory();
+    renderUserAffiliations();
+  } catch (err) {
+    container.innerHTML = `<div class="loading-box text-red">[ FAILED TO LOAD CLUBS: ${escapeHtml(err.message)} ]</div>`;
+  }
+}
+
+function renderClubsDirectory() {
+  const container = document.getElementById('clubs-directory-grid');
+  if (!container) return;
+
+  if (state.clubs.length === 0) {
+    container.innerHTML = '<div class="loading-box">[ NO CLUBS REGISTERED YET ]</div>';
+    return;
+  }
+
+  let html = '';
+  state.clubs.forEach((club) => {
+    const memberCount = club._count?.members ?? 0;
+    const isMember = state.userMemberships.has(club.id);
+
+    html += `
+      <div class="directory-card" data-club-id="${club.id}">
+        <div class="directory-card-header">
+          <span class="directory-card-slug">c/${escapeHtml(club.slug || 'club')}</span>
+          <span class="badge ${memberCount > 0 ? 'green' : ''}">[ ${memberCount} MEMBERS ]</span>
+        </div>
+        <h3 class="directory-card-title">${escapeHtml(club.name)}</h3>
+        <p class="directory-card-desc">${escapeHtml(club.description || 'No description provided.')}</p>
+        <div class="directory-card-meta">
+          <div class="meta-item">
+            <strong>FOUNDED:</strong> <span>${formatTimeAgo(club.createdAt)}</span>
+          </div>
+          <div class="meta-item">
+            <strong>ID:</strong> <span class="telemetry-mono">${club.id.substring(0, 8)}...</span>
+          </div>
+        </div>
+        <div class="directory-card-actions">
+          ${
+            isMember
+              ? `<button class="brutal-btn mini red-btn btn-leave-club" data-club-id="${club.id}">[ LEAVE CLUB ]</button>`
+              : `<button class="brutal-btn mini btn-join-club" data-club-id="${club.id}">[ JOIN CLUB ]</button>`
+          }
+          <button class="brutal-btn mini btn-view-club-feed" data-tag="${escapeHtml(club.slug || '')}" data-name="${escapeHtml(club.name)}">
+            [ VIEW FEED DISPATCHES &gt;&gt; ]
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  container.querySelectorAll('.btn-join-club').forEach((btn) => {
+    btn.addEventListener('click', () => handleJoinClub(btn.dataset.clubId));
+  });
+  container.querySelectorAll('.btn-leave-club').forEach((btn) => {
+    btn.addEventListener('click', () => handleLeaveClub(btn.dataset.clubId));
+  });
+  container.querySelectorAll('.btn-view-club-feed').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tag = btn.dataset.tag;
+      const name = btn.dataset.name;
+      switchView('feed');
+      setClubFilter(tag, `c/${tag} (${name})`);
+    });
+  });
+}
+
+async function handleJoinClub(clubId) {
+  if (!state.user) {
+    alert('Authentication required to join campus clubs. Please login.');
+    return;
+  }
+  try {
+    await apiRequest(`/clubs/${clubId}/join`, { method: 'POST' });
+    state.userMemberships.add(clubId);
+    await loadClubs();
+    renderClubsDirectory();
+    renderUserAffiliations();
+  } catch (err) {
+    alert(`Failed to join club: ${err.message}`);
+  }
+}
+
+async function handleLeaveClub(clubId) {
+  if (!state.user) return;
+  try {
+    await apiRequest(`/clubs/${clubId}/leave`, { method: 'DELETE' });
+    state.userMemberships.delete(clubId);
+    await loadClubs();
+    renderClubsDirectory();
+    renderUserAffiliations();
+  } catch (err) {
+    alert(`Failed to leave club: ${err.message}`);
+  }
+}
+
+function renderUserAffiliations() {
+  const container = document.getElementById('user-clubs-summary-body');
+  if (!container) return;
+
+  if (!state.user) {
+    container.innerHTML = '<p class="telemetry-mono text-muted">[ AUTHENTICATE TO VIEW AFFILIATIONS ]</p>';
+    return;
+  }
+
+  const joinedClubs = state.clubs.filter((c) => state.userMemberships.has(c.id));
+  if (joinedClubs.length === 0) {
+    container.innerHTML = '<p class="telemetry-mono text-muted">[ NOT YET AFFILIATED WITH ANY CLUBS ]</p>';
+    return;
+  }
+
+  let html = '<ul class="clubs-list">';
+  joinedClubs.forEach((c) => {
+    html += `
+      <li>
+        <span class="telemetry-mono"><strong>c/${escapeHtml(c.slug)}</strong> - ${escapeHtml(c.name)}</span>
+      </li>
+    `;
+  });
+  html += '</ul>';
+  container.innerHTML = html;
+}
+
+function openClubModal() {
+  if (!state.user) {
+    alert('Authentication required to charter a club. Please log in.');
+    return;
+  }
+  document.getElementById('club-modal').style.display = 'flex';
+}
+
+function closeClubModal() {
+  document.getElementById('club-modal').style.display = 'none';
+  document.getElementById('create-club-form').reset();
+}
+
+// ============================================================================
+// 10C. EVENTS & CONCURRENCY TICKETING
+// ============================================================================
+async function loadEventsDirectory() {
+  const container = document.getElementById('events-directory-grid');
+  const counter = document.getElementById('events-total-counter');
+  if (!container) return;
+
+  try {
+    container.innerHTML = '<div class="loading-box">[ QUERYING CAMPUS EVENTS SCHEDULE... ]</div>';
+    const res = await apiRequest('/events');
+    state.events = res.data.events || res.data || [];
+    if (counter) counter.textContent = `[ ${state.events.length} ACTIVE EVENTS ]`;
+
+    renderEventsDirectory();
+  } catch (err) {
+    container.innerHTML = `<div class="loading-box text-red">[ FAILED TO LOAD EVENTS: ${escapeHtml(err.message)} ]</div>`;
+  }
+}
+
+function renderEventsDirectory() {
+  const container = document.getElementById('events-directory-grid');
+  if (!container) return;
+
+  if (state.events.length === 0) {
+    container.innerHTML = `
+      <div class="loading-box">
+        [ NO CAMPUS EVENTS CURRENTLY SCHEDULED ]<br><br>
+        Club administrators can schedule workshops, hackathons, and lectures using the "+ SCHEDULE EVENT" button above.
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  state.events.forEach((ev) => {
+    const isClaimed = state.userTickets.some((t) => t.eventId === ev.id);
+    const hostClub = state.clubs.find((c) => c.id === ev.clubId);
+    const hostSlug = hostClub ? `c/${hostClub.slug}` : 'CAMPUS-WIDE';
+
+    const startDate = new Date(ev.startTime);
+    const endDate = new Date(ev.endTime);
+    const timeFormatted = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} &rarr; ${endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+    html += `
+      <div class="directory-card event-card" data-event-id="${ev.id}">
+        <div class="directory-card-header">
+          <span class="directory-card-slug">${escapeHtml(hostSlug)}</span>
+          <span class="badge ${isClaimed ? 'green' : 'red'}">[ ${isClaimed ? 'REGISTERED' : 'OPEN RSVP'} ]</span>
+        </div>
+        <h3 class="directory-card-title">${escapeHtml(ev.title)}</h3>
+        <p class="directory-card-desc">${escapeHtml(ev.description || '')}</p>
+        <div class="directory-card-meta">
+          <div class="meta-item">
+            <strong>LOCATION:</strong> <span>${escapeHtml(ev.location)}</span>
+          </div>
+          <div class="meta-item">
+            <strong>TIME:</strong> <span>${timeFormatted}</span>
+          </div>
+          <div class="meta-item">
+            <strong>CAPACITY:</strong> <span>${ev.capacity} SEATS</span>
+          </div>
+        </div>
+        <div class="directory-card-actions">
+          ${
+            isClaimed
+              ? `<button class="brutal-btn mini" disabled>[ &check; TICKET CLAIMED IN WALLET ]</button>`
+              : `<button class="brutal-btn mini red-btn btn-claim-ticket" data-event-id="${ev.id}" data-event-title="${escapeHtml(ev.title)}">[ CLAIM TICKET / RSVP ]</button>`
+          }
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  container.querySelectorAll('.btn-claim-ticket').forEach((btn) => {
+    btn.addEventListener('click', () => handleClaimTicket(btn.dataset.eventId, btn.dataset.eventTitle));
+  });
+}
+
+async function handleClaimTicket(eventId, eventTitle) {
+  if (!state.user) {
+    alert('Operator authentication required to reserve tickets with ACID locking. Please log in.');
+    return;
+  }
+
+  try {
+    const res = await apiRequest(`/events/${eventId}/register`, { method: 'POST' });
+    const reg = res.data.registration;
+
+    const newTicket = {
+      id: reg.id,
+      ticketCode: reg.ticketCode,
+      eventId: eventId,
+      eventTitle: eventTitle,
+      createdAt: reg.createdAt || new Date().toISOString(),
+    };
+
+    state.userTickets.unshift(newTicket);
+    localStorage.setItem('campushub_user_tickets', JSON.stringify(state.userTickets));
+
+    alert(`TICKET CONFIRMED!\n\nPass Code: ${newTicket.ticketCode}\nYour seat is locked in PostgreSQL via pessimistic row transaction.`);
+    renderEventsDirectory();
+    renderTicketWallet();
+  } catch (err) {
+    alert(`Ticket reservation failed: ${err.message}`);
+  }
+}
+
+function renderTicketWallet() {
+  const container = document.getElementById('ticket-wallet-list');
+  if (!container) return;
+
+  if (!state.userTickets || state.userTickets.length === 0) {
+    container.innerHTML = '<div class="empty-wallet">[ NO TICKETS ISSUED YET. CLAIM AN RSVP FROM THE SCHEDULE. ]</div>';
+    return;
+  }
+
+  let html = '';
+  state.userTickets.forEach((ticket) => {
+    html += `
+      <div class="ticket-pass">
+        <div class="ticket-pass-title">${escapeHtml(ticket.eventTitle || 'Campus Event')}</div>
+        <div class="ticket-pass-code">${escapeHtml(ticket.ticketCode)}</div>
+        <div class="ticket-barcode">||| | |||| | || ||| |||| |</div>
+        <div class="ticket-pass-time">ISSUED: ${new Date(ticket.createdAt).toLocaleString()}</div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+function openEventModal() {
+  if (!state.user) {
+    alert('Authentication required to schedule campus events. Please log in.');
+    return;
+  }
+  populateEventClubSelect();
+  document.getElementById('event-modal').style.display = 'flex';
+}
+
+function closeEventModal() {
+  document.getElementById('event-modal').style.display = 'none';
+  document.getElementById('create-event-form').reset();
+}
+
+function populateEventClubSelect() {
+  const select = document.getElementById('new-event-club');
+  if (!select) return;
+  select.innerHTML = '<option value="">-- SELECT HOSTING CLUB --</option>';
+  state.clubs.forEach((c) => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = `${c.name} (c/${c.slug})`;
+    select.appendChild(opt);
+  });
+}
+
+// ============================================================================
 // 11. INITIALIZATION & GLOBAL LISTENERS
 // ============================================================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -898,6 +1249,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Auth
   renderAuthCard();
+  renderUserAffiliations();
+  renderTicketWallet();
+
+  // Module Tabs Navigation
+  document.querySelectorAll('.module-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      switchView(btn.dataset.view);
+    });
+  });
 
   // Clubs & Posts
   loadClubs();
@@ -940,10 +1300,26 @@ document.addEventListener('DOMContentLoaded', () => {
     setClubFilter('', '');
   });
 
-  // Modal open/close
+  // Modal open/close: Post
   document.getElementById('btn-open-post-modal').addEventListener('click', openPostModal);
   document.getElementById('close-modal-btn').addEventListener('click', closePostModal);
   document.getElementById('cancel-post-btn').addEventListener('click', closePostModal);
+
+  // Modal open/close: Club
+  const btnOpenClub = document.getElementById('btn-open-club-modal');
+  if (btnOpenClub) btnOpenClub.addEventListener('click', openClubModal);
+  const btnCloseClub = document.getElementById('close-club-modal-btn');
+  if (btnCloseClub) btnCloseClub.addEventListener('click', closeClubModal);
+  const btnCancelClub = document.getElementById('cancel-club-btn');
+  if (btnCancelClub) btnCancelClub.addEventListener('click', closeClubModal);
+
+  // Modal open/close: Event
+  const btnOpenEvent = document.getElementById('btn-open-event-modal');
+  if (btnOpenEvent) btnOpenEvent.addEventListener('click', openEventModal);
+  const btnCloseEvent = document.getElementById('close-event-modal-btn');
+  if (btnCloseEvent) btnCloseEvent.addEventListener('click', closeEventModal);
+  const btnCancelEvent = document.getElementById('cancel-event-btn');
+  if (btnCancelEvent) btnCancelEvent.addEventListener('click', closeEventModal);
 
   // Edit modal close
   document.getElementById('close-edit-modal-btn').addEventListener('click', closeEditModal);
@@ -974,6 +1350,74 @@ document.addEventListener('DOMContentLoaded', () => {
       alert(`Broadcast failed: ${err.message}`);
     }
   });
+
+  // Submit Create Club Form
+  const clubForm = document.getElementById('create-club-form');
+  if (clubForm) {
+    clubForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('new-club-name').value.trim();
+      const description = document.getElementById('new-club-description').value.trim();
+      const bannerUrl = document.getElementById('new-club-banner').value.trim() || null;
+
+      try {
+        const res = await apiRequest('/clubs', {
+          method: 'POST',
+          body: JSON.stringify({ name, description, bannerUrl }),
+        });
+        closeClubModal();
+        if (res.data?.club?.id) {
+          state.userMemberships.add(res.data.club.id);
+        }
+        await loadClubs();
+        renderClubsDirectory();
+        renderUserAffiliations();
+        alert(`Club "c/${res.data.club.slug}" chartered successfully! You are assigned as founder/ADMIN.`);
+      } catch (err) {
+        alert(`Failed to charter club: ${err.message}`);
+      }
+    });
+  }
+
+  // Submit Create Event Form
+  const eventForm = document.getElementById('create-event-form');
+  if (eventForm) {
+    eventForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const clubId = document.getElementById('new-event-club').value;
+      const title = document.getElementById('new-event-title').value.trim();
+      const location = document.getElementById('new-event-location').value.trim();
+      const startInput = document.getElementById('new-event-start').value;
+      const endInput = document.getElementById('new-event-end').value;
+      const capacity = parseInt(document.getElementById('new-event-capacity').value, 10);
+      const description = document.getElementById('new-event-description').value.trim();
+
+      if (!clubId || !title || !location || !startInput || !endInput || isNaN(capacity) || !description) {
+        alert('Please fill out all required fields.');
+        return;
+      }
+
+      const startTime = new Date(startInput).toISOString();
+      const endTime = new Date(endInput).toISOString();
+
+      if (new Date(endTime) <= new Date(startTime)) {
+        alert('End time must be strictly after start time.');
+        return;
+      }
+
+      try {
+        await apiRequest(`/clubs/${clubId}/events`, {
+          method: 'POST',
+          body: JSON.stringify({ title, location, startTime, endTime, capacity, description }),
+        });
+        closeEventModal();
+        await loadEventsDirectory();
+        alert(`Event "${title}" broadcasted and open for high-concurrency ticket registrations!`);
+      } catch (err) {
+        alert(`Failed to schedule event: ${err.message}`);
+      }
+    });
+  }
 
   // Submit Edit Form
   document.getElementById('edit-form').addEventListener('submit', async (e) => {
