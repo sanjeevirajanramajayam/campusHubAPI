@@ -13,6 +13,7 @@ import { swaggerSpec, swaggerUiOptions } from './infrastructure/docs/swagger.con
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createClubRouter } from './modules/clubs/club.routes.js';
 import { createEventRouter, createClubEventRouter } from './modules/events/event.routes.js';
+import { createPostRouter } from './modules/posts/post.routes.js';
 
 export const createApp = (): Application => {
   const app = express();
@@ -30,6 +31,7 @@ export const createApp = (): Application => {
             'https://cdnjs.cloudflare.com',
             'https://fonts.googleapis.com',
           ],
+          'font-src': ["'self'", 'https://fonts.gstatic.com'],
           'img-src': ["'self'", 'data:', 'https://validator.swagger.io'],
         },
       },
@@ -102,6 +104,9 @@ export const createApp = (): Application => {
   // Mount Global Events & Ticketing Module
   apiRouter.use('/events', createEventRouter());
 
+  // Mount Community Posts & Threaded Forum Module
+  apiRouter.use('/posts', createPostRouter());
+
   // Mount API Router under configured prefix (e.g. /api/v1)
   app.use(env.API_PREFIX, apiRouter);
 
@@ -112,12 +117,15 @@ export const createApp = (): Application => {
   });
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
 
-  // 8. 404 Handler for undefined routes
+  // 8. Serve Static Brutalist Frontend Assets
+  app.use(express.static('public'));
+
+  // 9. 404 Handler for undefined routes
   app.use((req: Request) => {
     throw new NotFoundError(`Route ${req.method} ${req.originalUrl} not found`);
   });
 
-  // 9. Global Centralized Error Handler (must be last middleware)
+  // 10. Global Centralized Error Handler (must be last middleware)
   app.use(errorHandler);
 
   return app;

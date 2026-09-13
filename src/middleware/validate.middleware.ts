@@ -11,10 +11,28 @@ import { ValidationError } from '../common/errors/app-error.js';
  * 3. Formats multiple Zod validation issues into a consistent, readable error response.
  */
 export const validate =
-  (schema: ZodTypeAny) =>
+  (schema: ZodTypeAny, source: 'body' | 'query' | 'params' = 'body') =>
   async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
-      req.body = await schema.parseAsync(req.body);
+      if (source === 'query') {
+        const parsed = (await schema.parseAsync(req.query)) as Record<string, unknown>;
+        Object.defineProperty(req, 'query', {
+          value: parsed,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      } else if (source === 'params') {
+        const parsed = (await schema.parseAsync(req.params)) as Record<string, unknown>;
+        Object.defineProperty(req, 'params', {
+          value: parsed,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      } else {
+        req.body = await schema.parseAsync(req.body);
+      }
       next();
     } catch (err) {
       if (err instanceof ZodError) {

@@ -1,0 +1,775 @@
+/* ==========================================================================
+   CAMPUSHUB INDUSTRIAL BRUTALISM & OLD REDDIT STYLE SHEET
+   Substrate: #F4F4F0 (Newsprint) | Ink: #111111 (Carbon) | Accent: #E61919 (Hazard Red)
+   ========================================================================== */
+
+:root {
+  --bg-substrate: #f4f4f0;
+  --bg-card: #ffffff;
+  --text-ink: #111111;
+  --text-muted: #555555;
+  --border-color: #111111;
+  --accent-red: #e61919;
+  --accent-green: #15803d;
+  --font-header: 'Archivo Black', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Space Mono', monospace, 'Courier New';
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border-radius: 0 !important; /* STRICT BRUTALISM: NO ROUNDED CORNERS */
+}
+
+body {
+  background-color: var(--bg-substrate);
+  color: var(--text-ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   TOP TELEMETRY TICKER
+   ========================================================================== */
+.ticker-bar {
+  background: var(--text-ink);
+  color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 16px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.ticker-left, .ticker-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge {
+  padding: 2px 6px;
+  font-weight: 700;
+  font-size: 10px;
+}
+.badge.red { background: var(--accent-red); color: #fff; }
+.badge.green { background: var(--accent-green); color: #fff; }
+
+.pipe { color: #666; }
+.ticker-link {
+  color: #ff9999;
+  text-decoration: none;
+  font-weight: 700;
+}
+.ticker-link:hover { text-decoration: underline; }
+
+/* ==========================================================================
+   CLUB SUB-NAV (OLD REDDIT SUBREDDIT BAR)
+   ========================================================================== */
+.club-nav {
+  background: #eae8e3;
+  border-bottom: 1px solid var(--border-color);
+  padding: 6px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.nav-prefix {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.club-chip {
+  color: var(--text-ink);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+}
+.club-chip:hover {
+  background: var(--text-ink);
+  color: #fff;
+  border-color: var(--text-ink);
+}
+.club-chip.active {
+  background: var(--accent-red);
+  color: #fff;
+  border-color: var(--accent-red);
+}
+
+/* ==========================================================================
+   HERO STRIP
+   ========================================================================== */
+.hero-strip {
+  padding: 24px 20px 16px;
+  border-bottom: 2px solid var(--border-color);
+  background: #ebe9e4;
+}
+
+.logo-title {
+  font-family: var(--font-header);
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: var(--text-ink);
+  text-transform: uppercase;
+}
+
+.logo-sub {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* ==========================================================================
+   MAIN LAYOUT (FEED + SIDEBAR)
+   ========================================================================== */
+.main-layout {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 16px;
+}
+
+@media (max-width: 960px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   FEED CONTROLS
+   ========================================================================== */
+.feed-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 2px solid var(--border-color);
+  background: #ffffff;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sort-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.sort-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.sort-btn.active, .sort-btn:hover {
+  background: var(--text-ink);
+  color: #fff;
+}
+
+.search-bar {
+  display: flex;
+  gap: 4px;
+}
+.search-bar input {
+  border: 1px solid var(--border-color);
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  width: 180px;
+}
+
+.filter-banner {
+  background: #fff3cd;
+  border: 1px solid var(--border-color);
+  padding: 6px 12px;
+  font-size: 11px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.text-link {
+  background: none;
+  border: none;
+  color: var(--accent-red);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+/* ==========================================================================
+   POSTS STREAM (OLD REDDIT COMPONENT)
+   ========================================================================== */
+.posts-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.post-item {
+  background: #ffffff;
+  border: 2px solid var(--border-color);
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  transition: border-color 0.1s;
+}
+.post-item:hover {
+  border-color: #000000;
+  box-shadow: 2px 2px 0px #111111;
+}
+
+/* Old Reddit Vertical Vote Column */
+.vote-col {
+  background: #faf8f5;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 10px 0;
+  gap: 4px;
+}
+
+.vote-btn {
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  color: #888888;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.vote-btn:hover {
+  color: var(--accent-red);
+}
+.vote-btn.upvoted {
+  color: var(--accent-red);
+  font-weight: 900;
+}
+
+.vote-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-ink);
+}
+.vote-count.upvoted {
+  color: var(--accent-red);
+}
+
+/* Post Content Column */
+.post-main {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.post-header-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.post-title {
+  font-family: var(--font-header);
+  font-size: 15px;
+  line-height: 1.2;
+  color: var(--text-ink);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+}
+.post-title:hover {
+  color: var(--accent-red);
+  text-decoration: underline;
+}
+
+.post-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border: 1px solid var(--border-color);
+  background: #eae8e3;
+}
+
+.post-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.post-meta strong {
+  color: var(--text-ink);
+}
+
+.post-body {
+  font-size: 12px;
+  color: #222222;
+  line-height: 1.5;
+  background: #fdfdfc;
+  padding: 8px;
+  border-left: 3px solid #111111;
+  margin: 4px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.post-body.tombstone {
+  color: #777777;
+  font-style: italic;
+  background: #f1f0ec;
+  border-left-color: #999999;
+}
+
+/* Post Footer / Actions (Old Reddit style links) */
+.post-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.action-link {
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.action-link:hover {
+  color: var(--text-ink);
+  text-decoration: underline;
+}
+.action-link.red:hover {
+  color: var(--accent-red);
+}
+
+/* ==========================================================================
+   THREADED COMMENTS SECTION
+   ========================================================================== */
+.comments-drawer {
+  grid-column: 1 / -1;
+  border-top: 2px solid var(--border-color);
+  background: #fbfbf9;
+  padding: 12px 16px;
+}
+
+.comments-header {
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Comment Editor */
+.comment-input-box {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.comment-input-box textarea {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: #ffffff;
+  resize: vertical;
+}
+
+/* Nested Comment Tree Architecture */
+.comment-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-node {
+  border-left: 2px solid var(--border-color);
+  padding-left: 10px;
+  margin-left: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comment-node.depth-1 { margin-left: 0; }
+.comment-node.depth-2 { margin-left: 14px; border-left-color: #666; }
+.comment-node.depth-3 { margin-left: 28px; border-left-color: var(--accent-red); }
+
+.comment-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.comment-author {
+  font-weight: 700;
+  color: var(--text-ink);
+}
+.comment-depth-tag {
+  font-size: 9px;
+  padding: 1px 3px;
+  background: #eae8e3;
+  border: 1px solid #ccc;
+}
+
+.comment-text {
+  font-size: 11px;
+  color: #111111;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.comment-text.tombstone {
+  color: #888888;
+  font-style: italic;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+/* Inline Reply Form */
+.reply-form {
+  margin-top: 6px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ==========================================================================
+   SIDEBAR & BRUTAL CARDS
+   ========================================================================== */
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.brutal-card {
+  background: #ffffff;
+  border: 2px solid var(--border-color);
+  box-shadow: 2px 2px 0px #111111;
+}
+
+.card-header {
+  background: var(--text-ink);
+  color: #ffffff;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.card-body {
+  padding: 12px;
+}
+
+/* Auth Card Elements */
+.auth-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 10px;
+}
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 0;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tab-btn.active {
+  border-bottom-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.brutal-input, .brutal-select, .brutal-textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color);
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: #ffffff;
+  color: var(--text-ink);
+  outline: none;
+}
+.brutal-input:focus, .brutal-textarea:focus {
+  border-color: var(--accent-red);
+  box-shadow: 1px 1px 0px var(--accent-red);
+}
+
+.auth-status {
+  margin-top: 8px;
+  padding: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid var(--border-color);
+}
+.auth-status.error { background: #fee2e2; color: #b91c1c; border-color: #b91c1c; }
+.auth-status.success { background: #dcfce7; color: #15803d; border-color: #15803d; }
+
+.user-session-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.user-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-ink);
+}
+.role-badge {
+  font-size: 10px;
+  padding: 2px 4px;
+  background: #eae8e3;
+  border: 1px solid #111;
+  display: inline-block;
+  align-self: flex-start;
+}
+
+/* Primary Action Submit Button */
+.primary-action {
+  font-family: var(--font-header);
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  padding: 12px 16px;
+  background: var(--accent-red);
+  color: #ffffff;
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  box-shadow: 3px 3px 0px #111111;
+  transition: transform 0.05s, box-shadow 0.05s;
+}
+.primary-action:hover {
+  background: #cc1010;
+}
+.primary-action:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px #111111;
+}
+
+/* Clubs List */
+.clubs-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.club-item-link {
+  display: flex;
+  justify-content: space-between;
+  text-decoration: none;
+  color: var(--text-ink);
+  font-size: 11px;
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+}
+.club-item-link:hover {
+  background: var(--text-ink);
+  color: #fff;
+  border-color: var(--text-ink);
+}
+
+/* Rules Card */
+.rules-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rule-row {
+  display: flex;
+  flex-direction: column;
+  font-size: 10px;
+  border-bottom: 1px dotted #ccc;
+  padding-bottom: 4px;
+}
+.rule-code {
+  font-weight: 700;
+  color: var(--accent-red);
+}
+.rule-desc {
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   BUTTONS & UTILITIES
+   ========================================================================== */
+.brutal-btn {
+  background: #ffffff;
+  color: var(--text-ink);
+  border: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.brutal-btn:hover {
+  background: var(--text-ink);
+  color: #ffffff;
+}
+.brutal-btn.mini {
+  padding: 3px 8px;
+  font-size: 10px;
+}
+.brutal-btn.full {
+  width: 100%;
+}
+.brutal-btn.red-btn {
+  background: var(--accent-red);
+  color: #ffffff;
+  border-color: var(--border-color);
+}
+.brutal-btn.red-btn:hover {
+  background: #b50f0f;
+}
+
+/* ==========================================================================
+   MODAL OVERLAY
+   ========================================================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.brutal-modal {
+  background: #ffffff;
+  border: 3px solid var(--border-color);
+  box-shadow: 6px 6px 0px #111111;
+  width: 100%;
+  max-width: 580px;
+}
+
+.modal-header {
+  background: var(--text-ink);
+  color: #ffffff;
+  padding: 10px 14px;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.close-btn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.modal-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Pagination & Status */
+.pagination-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  margin-top: 12px;
+}
+
+.loading-box {
+  padding: 24px;
+  text-align: center;
+  border: 2px dashed #999;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* Footer */
+.footer-bar {
+  background: #ebe9e4;
+  border-top: 2px solid var(--border-color);
+  padding: 16px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 40px;
+}

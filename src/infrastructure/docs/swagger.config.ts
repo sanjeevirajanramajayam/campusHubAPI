@@ -63,6 +63,10 @@ Welcome to the official interactive API documentation for **CampusHub**.
       description: 'Campus events, scheduling, and concurrency-safe seat ticketing',
     },
     {
+      name: 'Posts',
+      description: 'Community forum feed, topic tagging, upvoting, and threaded discussions',
+    },
+    {
       name: 'System',
       description: 'Operational health probes and uptime metrics',
     },
@@ -320,6 +324,130 @@ Welcome to the official interactive API documentation for **CampusHub**.
           uptime: { type: 'number', example: 1243.5 },
           timestamp: { type: 'string', format: 'date-time', example: '2026-09-04T03:50:00.000Z' },
           environment: { type: 'string', example: 'production' },
+        },
+      },
+      CreatePostRequest: {
+        type: 'object',
+        required: ['title', 'content'],
+        properties: {
+          title: {
+            type: 'string',
+            minLength: 5,
+            maxLength: 120,
+            example: 'Hackathon Partner Search',
+          },
+          content: {
+            type: 'string',
+            minLength: 10,
+            maxLength: 10000,
+            example: 'Looking for a frontend developer proficient with React.',
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            example: ['hackathon', 'react'],
+          },
+        },
+      },
+      UpdatePostRequest: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', minLength: 5, maxLength: 120 },
+          content: { type: 'string', minLength: 10, maxLength: 10000 },
+          tags: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      PostResponseData: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid', example: 'p1a2b3c4-d5e6-7890-abcd-ef1234567890' },
+          authorId: { type: 'string', format: 'uuid' },
+          title: { type: 'string', example: 'Hackathon Partner Search' },
+          content: { type: 'string', example: 'Looking for a frontend developer.' },
+          tags: { type: 'array', items: { type: 'string' }, example: ['hackathon', 'react'] },
+          isEdited: { type: 'boolean', example: false },
+          isDeleted: { type: 'boolean', example: false },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          author: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              firstName: { type: 'string', example: 'Jane' },
+              lastName: { type: 'string', example: 'Doe' },
+              avatarUrl: { type: 'string', nullable: true },
+            },
+          },
+          _count: {
+            type: 'object',
+            properties: {
+              comments: { type: 'integer', example: 5 },
+              likes: { type: 'integer', example: 12 },
+            },
+          },
+          isLikedByCaller: { type: 'boolean', example: false },
+        },
+      },
+      CreateCommentRequest: {
+        type: 'object',
+        required: ['content'],
+        properties: {
+          content: {
+            type: 'string',
+            minLength: 2,
+            maxLength: 2000,
+            example: 'I am interested in joining!',
+          },
+          parentId: {
+            type: 'string',
+            format: 'uuid',
+            nullable: true,
+            description: 'ID of parent comment to reply to (max 3-level depth)',
+          },
+        },
+      },
+      UpdateCommentRequest: {
+        type: 'object',
+        required: ['content'],
+        properties: {
+          content: { type: 'string', minLength: 2, maxLength: 2000 },
+        },
+      },
+      CommentResponseData: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          postId: { type: 'string', format: 'uuid' },
+          authorId: { type: 'string', format: 'uuid' },
+          parentId: { type: 'string', format: 'uuid', nullable: true },
+          content: { type: 'string', example: 'I am interested in joining!' },
+          isEdited: { type: 'boolean', example: false },
+          isDeleted: { type: 'boolean', example: false },
+          createdAt: { type: 'string', format: 'date-time' },
+          author: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              firstName: { type: 'string', example: 'Alex' },
+              lastName: { type: 'string', example: 'Chen' },
+              avatarUrl: { type: 'string', nullable: true },
+            },
+          },
+          _count: {
+            type: 'object',
+            properties: {
+              likes: { type: 'integer', example: 3 },
+              replies: { type: 'integer', example: 1 },
+            },
+          },
+          isLikedByCaller: { type: 'boolean', example: false },
+        },
+      },
+      LikeResponseData: {
+        type: 'object',
+        properties: {
+          liked: { type: 'boolean', example: true },
+          totalLikes: { type: 'integer', example: 13 },
         },
       },
     },
@@ -968,6 +1096,331 @@ Executes a high-concurrency ticket purchase with:
                       type: 'array',
                       items: { $ref: '#/components/schemas/TicketResponseData' },
                     },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/posts': {
+      get: {
+        tags: ['Posts'],
+        summary: 'List Community Posts (Feed)',
+        description:
+          'Retrieves active forum posts with pagination, tag filtering, search, and sorting (latest or popular).',
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 10 } },
+          { name: 'tag', in: 'query', schema: { type: 'string' } },
+          { name: 'search', in: 'query', schema: { type: 'string' } },
+          {
+            name: 'sortBy',
+            in: 'query',
+            schema: { type: 'string', enum: ['latest', 'popular'], default: 'latest' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Paginated list of posts',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        posts: {
+                          type: 'array',
+                          items: { $ref: '#/components/schemas/PostResponseData' },
+                        },
+                        pagination: {
+                          type: 'object',
+                          properties: {
+                            page: { type: 'integer', example: 1 },
+                            limit: { type: 'integer', example: 10 },
+                            totalCount: { type: 'integer', example: 45 },
+                            totalPages: { type: 'integer', example: 5 },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ['Posts'],
+        summary: 'Create New Discussion Post',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CreatePostRequest' },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Post created successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        post: { $ref: '#/components/schemas/PostResponseData' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/posts/{id}': {
+      get: {
+        tags: ['Posts'],
+        summary: 'Get Post Details by ID',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          '200': {
+            description: 'Post details retrieved',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        post: { $ref: '#/components/schemas/PostResponseData' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          '404': { description: 'Post not found' },
+        },
+      },
+      patch: {
+        tags: ['Posts'],
+        summary: 'Update Discussion Post',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/UpdatePostRequest' } },
+          },
+        },
+        responses: {
+          '200': { description: 'Post updated' },
+          '403': { description: 'Forbidden (Only author or admin may edit)' },
+        },
+      },
+      delete: {
+        tags: ['Posts'],
+        summary: 'Soft-Delete Discussion Post',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          '200': { description: 'Post soft-deleted (replies preserved)' },
+          '403': { description: 'Forbidden' },
+        },
+      },
+    },
+    '/posts/{id}/like': {
+      post: {
+        tags: ['Posts'],
+        summary: 'Toggle Upvote / Like on Post',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        responses: {
+          '200': {
+            description: 'Like toggled',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    data: { $ref: '#/components/schemas/LikeResponseData' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/posts/{postId}/comments': {
+      get: {
+        tags: ['Posts'],
+        summary: 'List Threaded Comments for Post',
+        parameters: [
+          {
+            name: 'postId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Tree of threaded comments (max 3-levels)',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    data: {
+                      type: 'object',
+                      properties: {
+                        comments: {
+                          type: 'array',
+                          items: { $ref: '#/components/schemas/CommentResponseData' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ['Posts'],
+        summary: 'Add Comment or Reply to Post',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'postId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/CreateCommentRequest' } },
+          },
+        },
+        responses: {
+          '201': { description: 'Comment created' },
+          '400': { description: 'Max 3-level nesting depth exceeded' },
+        },
+      },
+    },
+    '/posts/{postId}/comments/{commentId}': {
+      patch: {
+        tags: ['Posts'],
+        summary: 'Update Comment Text',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'postId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+          {
+            name: 'commentId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/UpdateCommentRequest' } },
+          },
+        },
+        responses: {
+          '200': { description: 'Comment updated' },
+          '403': { description: 'Forbidden' },
+        },
+      },
+      delete: {
+        tags: ['Posts'],
+        summary: 'Soft-Delete Comment',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'postId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+          {
+            name: 'commentId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: {
+          '200': { description: 'Comment soft-deleted' },
+          '403': { description: 'Forbidden' },
+        },
+      },
+    },
+    '/posts/{postId}/comments/{commentId}/like': {
+      post: {
+        tags: ['Posts'],
+        summary: 'Toggle Upvote / Like on Comment',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'postId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+          {
+            name: 'commentId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Comment like toggled',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    data: { $ref: '#/components/schemas/LikeResponseData' },
                   },
                 },
               },
