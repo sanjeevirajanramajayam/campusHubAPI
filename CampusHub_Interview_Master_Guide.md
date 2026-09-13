@@ -1174,3 +1174,83 @@
   * **Zero Dependency Vulnerabilities**: Serving raw HTML/CSS/JS directly via Express static middleware eliminates build-chain supply-chain attacks, webpack/vite runtime overhead, and complex client bundle versioning.
   * **Deterministic Performance**: Native DOM manipulation executes in microseconds with negligible CPU and memory footprints.
 
+---
+
+## 10. API Performance, Pagination Patterns, HTTP ETags & Full-Text Search
+
+### Q108: Why does `OFFSET / LIMIT` pagination degrade exponentially on deep pages, and how does Keyset / Cursor-Based Pagination solve it?
+* **The `OFFSET` Performance Cliff in PostgreSQL**:
+  * When executing `SELECT * FROM members ORDER BY created_at DESC LIMIT 20 OFFSET 10000`, PostgreSQL **does not jump to row 10,000**.
+  * The storage engine must traverse the B-Tree index, fetch all 10,020 row pointers (tuples) from disk or shared buffers, evaluate MVCC visibility for each row, and then discard the first 10,000 rows.
+  * **Time Complexity**: `O(N + M)` where $N$ is the offset and $M$ is the limit. On tables with millions of rows, deep pages cause disk I/O thrashing and multi-second query spikes.
+* **The "Drifting Window" Problem (Data Inconsistency)**:
+  * In active feeds, if 5 new posts are published while a user is on Page 1, navigating to Page 2 (`OFFSET 20`) repeats the last 5 posts previously viewed because all rows shifted down by 5 positions. Conversely, deletes cause rows to be skipped entirely.
+* **Keyset / Cursor-Based Pagination Architecture**:
+  * Instead of offsetting row numbers, the client passes an opaque cursor representing the **exact position of the last item received**:
+    ```sql
+    SELECT id, title, created_at
+    FROM posts
+    WHERE (created_at, id) < ($cursor_created_at, $cursor_id)
+    ORDER BY created_at DESC, id DESC
+    LIMIT 20;
+    ```
+  * **B-Tree Seek Optimization**: Using a composite B-Tree index `(created_at DESC, id DESC)`, the query engine performs an `O(log N)` direct index seek to the exact cursor coordinate, scanning only the requested 20 rows. Execution time remains constant (~2ms) whether fetching page 1 or page 1,000.
+  * **Opaque Cursor Tokens**: We encode `(createdAt, id)` into a URL-safe Base64 token (e.g. `eyJ0IjoxNzg5MzIy...`). This abstracts database internals, preventing client coupling to database column names or schemas.
+
+### Q109: How do HTTP Conditional Requests and ETags work, and how does a 304 Not Modified save 99% of bandwidth?
+* **ETag Mechanics (RFC 9110 / RFC 7232)**:
+  * An `ETag` (Entity Tag) is an HTTP response header representing a digest/fingerprint of the resource state:
+    * **Strong ETag** (`ETag: "abc123"`): Byte-for-byte exact match (used for range requests).
+    * **Weak ETag** (`ETag: W/"abc123"`): Semantically equivalent content (safe for caching compressed JSON).
+* **The Conditional Request Workflow**:
+  1. **Initial Request**: Client requests `GET /api/v1/clubs/design`. Server computes hash of JSON body, responds with `200 OK`, `ETag: W/"4f8a-9B1c"`, and `Cache-Control: private, no-cache`.
+  2. **Subsequent Request**: Client attaches `If-None-Match: W/"4f8a-9B1c"`.
+  3. **Conditional Evaluation**:
+     * Server calculates current hash. If hash matches `If-None-Match`, the server returns `304 Not Modified` with **zero response body**.
+* **Bandwidth & Latency Impact**:
+  * For a 200KB club roster or event catalogue, `304 Not Modified` transmits only ~200 bytes of HTTP headers (a **99.9% bandwidth reduction**).
+  * Saves server serialization, network transmission time, mobile data consumption, and CPU battery life for mobile clients.
+
+### Q110: How does HTTP Response Compression (Brotli vs Gzip) operate, and when does compression hurt performance?
+* **Brotli (`br`) vs Gzip (`gzip`)**:
+  * **Gzip (DEFLATE algorithm)**: Universal HTTP/1.1 standard, balanced CPU and memory footprint, fast compression speeds.
+  * **Brotli**: Modern Google-developed algorithm using a static 122KB pre-computed dictionary of common web substrings (HTML tags, JSON keywords, HTTP headers). Achieves **15-25% higher compression density** than Gzip on JSON and CSS.
+* **The Compression Threshold Rule**:
+  * Small payloads (< 1KB) should **never be compressed**.
+  * The computational overhead of running LZ77/Huffman algorithms plus the byte overhead of compression headers can actually make payloads under 1KB **larger** than the raw uncompressed string while wasting CPU cycles.
+* **Express Integration**:
+  ```typescript
+  import compression from 'compression';
+
+  app.use(
+    compression({
+      threshold: 1024, // Only compress payloads > 1KB
+      filter: (req, res) => {
+        if (req.headers['x-no-compression']) return false;
+        return compression.filter(req, res);
+      },
+    }),
+  );
+  ```
+
+### Q111: How does PostgreSQL Full-Text Search with GIN Indexes and Trigrams (`pg_trgm`) compare to `LIKE '%query%'`?
+* **The Failure of `LIKE '%search%'`**:
+  * In a standard B-Tree index, keys are sorted sequentially from left to right.
+  * A prefix wildcard `LIKE '%search%'` or substring match cannot determine where to enter the B-Tree; PostgreSQL is forced to execute a **Full Table Sequential Scan** (`O(N)`), inspecting every single disk block and string.
+* **PostgreSQL Native Full-Text Search (tsvector & tsquery)**:
+  * **`to_tsvector('english', content)`**: Normalizes text by removing punctuation, discarding stop words ("the", "is", "at"), and stemming words to their morphological roots ("running", "runs" -> `'run':1,2`).
+  * **Generalized Inverted Index (GIN)**: Creates an inverted lookup table mapping each unique lexeme/stem to the physical list of row IDs that contain it.
+  * **Search Query**: `WHERE to_tsvector('english', title) @@ to_tsquery('english', 'microservices & distributed')`. Execution time drops from hundreds of milliseconds to under 2ms.
+* **Fuzzy Typo Tolerance with Trigrams (`pg_trgm`)**:
+  * Full-text search fails when students make typos (e.g. searching `"algoritm"` instead of `"algorithm"`).
+  * The `pg_trgm` extension breaks strings into contiguous 3-character slices:
+    * `"word"` -> `{"  w", " wo", "ord", "rd "}`.
+  * A GIN index on trigrams (`CREATE INDEX ON posts USING gin (title gin_trgm_ops)`) enables lightning-fast fuzzy matching:
+    ```sql
+    SELECT title, similarity(title, 'algoritm') AS score
+    FROM posts
+    WHERE title % 'algoritm' AND similarity(title, 'algoritm') > 0.3
+    ORDER BY score DESC;
+    ```
+
+
