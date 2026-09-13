@@ -28,10 +28,17 @@ export class PostService {
     callerId?: string,
   ): Promise<{
     posts: PostWithDetails[];
-    pagination: { page: number; limit: number; totalCount: number; totalPages: number };
+    pagination: {
+      page: number;
+      limit: number;
+      totalCount: number;
+      totalPages: number;
+      nextCursor?: string | null;
+      hasMore: boolean;
+    };
   }> {
-    const offset = (query.page - 1) * query.limit;
-    const { posts, totalCount } = await this.postRepository.findAll(
+    const offset = query.cursor ? undefined : (query.page - 1) * query.limit;
+    const { posts, totalCount, nextCursor, hasMore } = await this.postRepository.findAll(
       {
         tag: query.tag,
         clubId: query.clubId,
@@ -39,6 +46,7 @@ export class PostService {
         sortBy: query.sortBy,
         limit: query.limit,
         offset,
+        cursor: query.cursor,
       },
       callerId,
     );
@@ -50,6 +58,8 @@ export class PostService {
         limit: query.limit,
         totalCount,
         totalPages: Math.ceil(totalCount / query.limit),
+        nextCursor: nextCursor || null,
+        hasMore: !!hasMore,
       },
     };
   }

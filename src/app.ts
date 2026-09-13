@@ -1,6 +1,7 @@
 import express, { type Application, type Request, type Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import { env } from './config/env.js';
 import { logger } from './common/logger.js';
 import { errorHandler } from './middleware/error.middleware.js';
@@ -17,6 +18,23 @@ import { createPostRouter } from './modules/posts/post.routes.js';
 
 export const createApp = (): Application => {
   const app = express();
+
+  // 0. HTTP ETag Configuration (RFC 9110: Weak ETags for 304 Not Modified caching)
+  app.set('etag', 'weak');
+
+  // 0.1 HTTP Response Compression (Brotli / Gzip) with >1KB threshold
+  app.use(
+    compression({
+      threshold: 1024,
+      filter: (req, res) => {
+        // Do not compress Server-Sent Events streams or when explicitly suppressed
+        if (req.headers.accept === 'text/event-stream' || req.headers['x-no-compression']) {
+          return false;
+        }
+        return compression.filter(req, res);
+      },
+    }),
+  );
 
   // 1. Security HTTP Headers with Swagger UI CSP support
   app.use(

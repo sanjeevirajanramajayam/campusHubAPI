@@ -20,6 +20,7 @@ export interface PostQueryFilters {
   sortBy?: 'latest' | 'popular';
   limit?: number;
   offset?: number;
+  cursor?: string;
 }
 
 export interface PostWithDetails extends Post {
@@ -31,13 +32,17 @@ export interface PostWithDetails extends Post {
   isLikedByCaller?: boolean;
 }
 
+export interface PostQueryResult {
+  posts: PostWithDetails[];
+  totalCount: number;
+  nextCursor?: string | null;
+  hasMore: boolean;
+}
+
 export interface IPostRepository {
   create(data: CreatePostDTO): Promise<Post>;
   findById(id: string, callerId?: string): Promise<PostWithDetails | null>;
-  findAll(
-    filters: PostQueryFilters,
-    callerId?: string,
-  ): Promise<{ posts: PostWithDetails[]; totalCount: number }>;
+  findAll(filters: PostQueryFilters, callerId?: string): Promise<PostQueryResult>;
   update(id: string, data: UpdatePostDTO): Promise<Post>;
   softDelete(id: string): Promise<void>;
   toggleLike(postId: string, userId: string): Promise<{ liked: boolean; totalLikes: number }>;

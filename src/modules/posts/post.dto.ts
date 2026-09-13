@@ -70,6 +70,7 @@ export const updateCommentSchema = z.object({
 export const postQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(10),
+  cursor: z.string().trim().optional(),
   tag: z.string().trim().toLowerCase().optional(),
   clubId: z.string().trim().toLowerCase().optional(),
   search: z.string().trim().optional(),

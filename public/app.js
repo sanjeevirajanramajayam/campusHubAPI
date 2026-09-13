@@ -207,6 +207,8 @@ async function loadPosts() {
     const res = await apiRequest(`/posts?${params.toString()}`);
     state.posts = res.data.posts || res.data.items || [];
     state.totalPages = res.data.pagination?.totalPages || 1;
+    state.nextCursor = res.data.pagination?.nextCursor || null;
+    state.hasMore = res.data.pagination?.hasMore || false;
 
     renderPosts();
     renderPagination();
@@ -892,7 +894,8 @@ function renderPagination() {
   }
 
   bar.style.display = 'flex';
-  indicator.textContent = `PAGE ${state.page} / ${state.totalPages}`;
+  const cursorTag = state.nextCursor ? ' [CURSOR: READY]' : '';
+  indicator.textContent = `PAGE ${state.page} / ${state.totalPages}${cursorTag}`;
   prevBtn.disabled = state.page <= 1;
   nextBtn.disabled = state.page >= state.totalPages;
 }
