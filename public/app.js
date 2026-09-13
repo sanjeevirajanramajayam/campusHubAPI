@@ -57,6 +57,9 @@ async function apiRequest(endpoint, options = {}) {
     }
     return data;
   } catch (err) {
+    if (err.name === 'AbortError') {
+      return null;
+    }
     console.error(`API Error [${endpoint}]:`, err);
     throw err;
   }
@@ -191,7 +194,7 @@ function setClubFilter(tagSlug, label) {
 // ============================================================================
 // 5. POSTS STREAM
 // ============================================================================
-async function loadPosts() {
+async function loadPosts(signal) {
   const container = document.getElementById('posts-container');
   container.innerHTML = '<div class="loading-box">[ STREAMING TELEMETRY FEED... ]</div>';
 
@@ -204,7 +207,8 @@ async function loadPosts() {
     if (state.currentClubId) params.append('tag', state.currentClubId);
     if (state.searchQuery) params.append('search', state.searchQuery);
 
-    const res = await apiRequest(`/posts?${params.toString()}`);
+    const res = await apiRequest(`/posts?${params.toString()}`, { signal });
+    if (!res) return; // Request was aborted by newer input
     state.posts = res.data.posts || res.data.items || [];
     state.totalPages = res.data.pagination?.totalPages || 1;
     state.nextCursor = res.data.pagination?.nextCursor || null;
@@ -213,6 +217,7 @@ async function loadPosts() {
     renderPosts();
     renderPagination();
   } catch (err) {
+    if (err.name === 'AbortError') return;
     container.innerHTML = `<div class="loading-box" style="color: var(--accent-red);">[ ERROR LOADING FEED: ${escapeHtml(err.message)} ]</div>`;
   }
 }
@@ -705,6 +710,22 @@ function closeEditModal() {
   document.getElementById('edit-modal').style.display = 'none';
 }
 
+function openProfileModal() {
+  if (!state.user) return;
+  const nameInput = document.getElementById('edit-profile-name');
+  const avatarInput = document.getElementById('edit-profile-avatar');
+  if (nameInput) nameInput.value = state.user.name || '';
+  if (avatarInput) avatarInput.value = state.user.avatarUrl || '';
+  document.getElementById('profile-modal').style.display = 'flex';
+}
+
+function closeProfileModal() {
+  const modal = document.getElementById('profile-modal');
+  if (modal) modal.style.display = 'none';
+  const form = document.getElementById('edit-profile-form');
+  if (form) form.reset();
+}
+
 // ============================================================================
 // 9. AUTHENTICATION (LOGIN, REGISTER, LOGOUT)
 // ============================================================================
@@ -723,11 +744,15 @@ function renderAuthCard() {
         <div style="font-size: 10px; color: var(--accent-green); font-weight: 700;">
           [ JWT SESSION ACTIVE ]
         </div>
-        <button id="logout-btn" class="brutal-btn full mini" style="margin-top: 6px;">[ TERMINATE SESSION ]</button>
+        <div style="display: flex; gap: 4px; margin-top: 6px;">
+          <button id="btn-edit-profile" class="brutal-btn mini" style="flex: 1;">[ EDIT PROFILE ]</button>
+          <button id="logout-btn" class="brutal-btn mini red-btn" style="flex: 1;">[ LOGOUT ]</button>
+        </div>
       </div>
     `;
 
     document.getElementById('logout-btn').addEventListener('click', logout);
+    document.getElementById('btn-edit-profile').addEventListener('click', openProfileModal);
   } else {
     // Reset to login/register form
     container.innerHTML = `
@@ -1282,20 +1307,37 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Search
+  // Debounced Live Search with AbortController
   const searchInput = document.getElementById('search-input');
   const searchBtn = document.getElementById('search-btn');
-  searchBtn.addEventListener('click', () => {
+  let searchDebounceTimer = null;
+  let searchAbortController = null;
+
+  const triggerLiveSearch = () => {
+    if (searchAbortController) {
+      searchAbortController.abort(); // Cancel stale in-flight search requests
+    }
+    searchAbortController = new AbortController();
     state.searchQuery = searchInput.value.trim();
     state.page = 1;
-    loadPosts();
+    loadPosts(searchAbortController.signal);
+  };
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(triggerLiveSearch, 300);
   });
+
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      state.searchQuery = searchInput.value.trim();
-      state.page = 1;
-      loadPosts();
+      clearTimeout(searchDebounceTimer);
+      triggerLiveSearch();
     }
+  });
+
+  searchBtn.addEventListener('click', () => {
+    clearTimeout(searchDebounceTimer);
+    triggerLiveSearch();
   });
 
   // Reset filter
@@ -1327,6 +1369,47 @@ document.addEventListener('DOMContentLoaded', () => {
   // Edit modal close
   document.getElementById('close-edit-modal-btn').addEventListener('click', closeEditModal);
   document.getElementById('cancel-edit-btn').addEventListener('click', closeEditModal);
+
+  // Profile modal close & submit
+  const btnCloseProfile = document.getElementById('close-profile-modal-btn');
+  if (btnCloseProfile) btnCloseProfile.addEventListener('click', closeProfileModal);
+  const btnCancelProfile = document.getElementById('cancel-profile-btn');
+  if (btnCancelProfile) btnCancelProfile.addEventListener('click', closeProfileModal);
+
+  const profileForm = document.getElementById('edit-profile-form');
+  if (profileForm) {
+    profileForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('edit-profile-name').value.trim();
+      const avatarUrl = document.getElementById('edit-profile-avatar').value.trim() || null;
+      const currentPassword = document.getElementById('edit-profile-curr-pw').value;
+      const newPassword = document.getElementById('edit-profile-new-pw').value;
+
+      const payload = {};
+      if (name) payload.name = name;
+      if (avatarUrl !== undefined) payload.avatarUrl = avatarUrl;
+      if (currentPassword && newPassword) {
+        payload.currentPassword = currentPassword;
+        payload.newPassword = newPassword;
+      }
+
+      try {
+        const res = await apiRequest('/auth/me', {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+        if (res.data?.user) {
+          state.user = res.data.user;
+          localStorage.setItem('campushub_user', JSON.stringify(state.user));
+          renderAuthCard();
+          closeProfileModal();
+          alert('Profile settings saved successfully!');
+        }
+      } catch (err) {
+        alert(`Profile update failed: ${err.message}`);
+      }
+    });
+  }
 
   // Submit Create Post Form
   document.getElementById('create-post-form').addEventListener('submit', async (e) => {

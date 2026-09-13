@@ -29,3 +29,13 @@ export const loginSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const updateProfileSchema = z.object({
+  firstName: z.string().trim().min(1).max(50).optional(),
+  lastName: z.string().trim().min(1).max(50).optional(),
+  bio: z.string().trim().max(500).optional().nullable(),
+  avatarUrl: z.string().url('Invalid avatar URL').optional().nullable(),
+});
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+

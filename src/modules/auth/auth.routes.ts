@@ -4,7 +4,8 @@ import { AuthService } from './auth.service.js';
 import { PrismaUserRepository } from '../users/user.repository.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
-import { registerSchema, loginSchema } from './auth.dto.js';
+import { rateLimit } from '../../middleware/rate-limit.middleware.js';
+import { registerSchema, loginSchema, updateProfileSchema } from './auth.dto.js';
 
 /**
  * Creates and configures the Express Authentication Router
@@ -20,10 +21,16 @@ export const createAuthRouter = (): Router => {
   const authController = new AuthController(authService);
 
   router.post('/register', validate(registerSchema), authController.register);
-  router.post('/login', validate(loginSchema), authController.login);
+  router.post(
+    '/login',
+    rateLimit({ scope: 'auth_login', windowSeconds: 60, maxRequests: 5 }),
+    validate(loginSchema),
+    authController.login,
+  );
   router.post('/refresh', authController.refresh);
   router.post('/logout', authController.logout);
   router.get('/me', authenticate, authController.getMe);
+  router.patch('/me', authenticate, validate(updateProfileSchema), authController.updateMe);
 
   return router;
 };

@@ -77,6 +77,19 @@ export class AuthController {
     }
   };
 
+  updateMe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const user = await this.authService.updateProfile(req.user!.id, req.body);
+
+      res.status(200).json({
+        success: true,
+        data: { user },
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
   refresh = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const rawRefreshToken = req.cookies.refreshToken as string | undefined;

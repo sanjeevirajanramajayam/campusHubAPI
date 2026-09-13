@@ -19,7 +19,8 @@
     "test:concurrency": "vitest run tests/concurrency",
     "test:security": "vitest run tests/security",
     "test:coverage": "vitest run --coverage",
-    "test:load": "tsx scripts/load-test.ts"
+    "test:load": "tsx scripts/load-test.ts",
+    "test:stress": "tsx scripts/concurrency-stress-test.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.0",

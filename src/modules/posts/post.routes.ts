@@ -7,6 +7,7 @@ import { PrismaPostRepository } from './post.repository.js';
 import { PrismaCommentRepository } from './comment.repository.js';
 import { validate } from '../../middleware/validate.middleware.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
+import { rateLimit } from '../../middleware/rate-limit.middleware.js';
 import {
   createPostSchema,
   updatePostSchema,
@@ -31,7 +32,13 @@ export const createPostRouter = (): Router => {
   router.get('/', validate(postQuerySchema, 'query'), postController.list);
   router.get('/stream', postController.stream);
   router.get('/:id', postController.getById);
-  router.post('/', authenticate, validate(createPostSchema), postController.create);
+  router.post(
+    '/',
+    authenticate,
+    rateLimit({ scope: 'posts_create', windowSeconds: 60, maxRequests: 20 }),
+    validate(createPostSchema),
+    postController.create,
+  );
   router.patch('/:id', authenticate, validate(updatePostSchema), postController.update);
   router.delete('/:id', authenticate, postController.delete);
   router.post('/:id/like', authenticate, postController.toggleLike);

@@ -8,7 +8,7 @@ import {
 } from '../../common/security/password.service.js';
 import { JwtService, jwtService as defaultJwtService } from '../../common/security/jwt.service.js';
 import { ConflictError, UnauthorizedError, NotFoundError } from '../../common/errors/app-error.js';
-import type { RegisterInput, LoginInput } from './auth.dto.js';
+import type { RegisterInput, LoginInput, UpdateProfileInput } from './auth.dto.js';
 import type { User } from '@prisma/client';
 
 export type UserWithoutPassword = Omit<User, 'passwordHash'>;
@@ -196,5 +196,14 @@ export class AuthService {
       throw new NotFoundError('User not found');
     }
     return this.sanitizeUser(user);
+  }
+
+  async updateProfile(userId: string, input: UpdateProfileInput): Promise<UserWithoutPassword> {
+    const user = await this.userRepo.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+    const updated = await this.userRepo.update(userId, input);
+    return this.sanitizeUser(updated);
   }
 }
