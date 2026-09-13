@@ -14,6 +14,7 @@
 6. [Express Middleware Pipeline, Security & HTTP Standards](#6-express-middleware-pipeline-security--http-standards)
 7. [Process Lifecycle, Signals & Graceful Shutdown](#7-process-lifecycle-signals--graceful-shutdown)
 8. [Database Fundamentals, ORMs & Prisma](#8-database-fundamentals-orms--prisma)
+9. [Community Feed, Threaded Comments & Real-Time SSE Architecture](#9-community-feed-threaded-comments--real-time-sse-architecture)
 
 ---
 
@@ -1112,3 +1113,64 @@
 * **Security & Auth Integration**:
   * Configure `components.securitySchemes` with `bearerAuth` (HTTP Bearer JWT) and `cookieAuth` (HTTP-Only refresh cookies).
   * Enable `persistAuthorization: true` in Swagger UI options so developers do not have to re-enter their JWT access token on page refresh when testing protected endpoints.
+
+---
+
+## 9. Community Feed, Threaded Comments & Real-Time SSE Architecture
+
+### Q103: What is the Publish/Subscribe (Pub/Sub) pattern, and how does CampusHub use Redis Pub/Sub with Server-Sent Events (SSE) for distributed real-time feed updates?
+* **Pub/Sub Architectural Fundamentals**:
+  * **Decoupled Producers & Consumers**: Publishers emit messages to named channels (e.g. `campushub:feed_events`) without knowledge of who or how many consumers exist. Subscribers listen to channels and react asynchronously.
+  * **Horizontal Scaling Across Node Instances**: In a clustered production environment (e.g., multiple Node.js processes behind an ALB or Kubernetes pods), an upvote on Server A cannot reach a user connected to Server B via in-memory event emitters alone. Redis Pub/Sub acts as the universal messaging backplane connecting all server pods.
+* **Why Server-Sent Events (SSE) over WebSockets for Feeds?**:
+  * **Unidirectional Communication**: Feeds, notifications, and vote tickers flow strictly from server to client. WebSockets add unnecessary protocol overhead (bidirectional handshake, custom binary framing, stateful connection lifecycle).
+  * **HTTP/1.1 & HTTP/2 Compatibility**: SSE runs over standard HTTP (`Content-Type: text/event-stream`), traversing corporate firewalls, API gateways, and load balancers with zero custom proxy configuration.
+  * **Native Browser Resilience**: Browser `EventSource` has built-in exponential backoff reconnection logic.
+  * **Connection Heartbeats**: We emit `: keep-alive ping\n\n` comments every 25 seconds to prevent intermediate proxy timeouts (Cloudflare 100s timeout, AWS ALB 60s idle timeout).
+
+### Q104: How do you model and query Hierarchical Threaded Comments in PostgreSQL, and why did we choose Adjacency Lists with In-Memory Tree Assembly?
+* **Comparison of Hierarchical Data Models**:
+  * **1. Materialized Path (e.g. `/1/4/12/`)**: Good for subtree querying via `LIKE '1/4/%'`, but expensive updates when subtrees move and string parsing overhead.
+  * **2. Nested Sets (Left/Right integers)**: Lightning-fast read queries, but writing/inserting new comments requires locking and renumbering large portions of the tree (`O(N)` write bottleneck).
+  * **3. Adjacency List (`parentId -> id`)**: Simplest writes (`O(1)` insert), guarantees strict referential integrity with foreign key constraints (`ON DELETE CASCADE`), and aligns with relational design.
+* **Overcoming the N+1 Recursive Query Problem**:
+  * **The Anti-Pattern**: Querying top-level comments, then running a query for each child, resulting in dozens of database roundtrips.
+  * **Our Solution (Single Query + O(N) In-Memory Map Assembly)**:
+    1. Fetch all comments for a post in **one single SQL query** (`WHERE post_id = $1 ORDER BY created_at ASC`).
+    2. Populate a JavaScript `Map<string, CommentNode>` where keys are comment IDs and values have an empty `replies: []` array.
+    3. Iterate through the array once: if `parentId` is null, push to root array; if `parentId` exists, lookup the parent node in the map in `O(1)` time and push to `parent.replies`.
+    4. Time Complexity: `O(N)` linear time. Space Complexity: `O(N)` auxiliary map. Total database queries: exactly `1`.
+
+### Q105: How do you enforce Business Rules for Nested Thread Depth (`BR-COMM-003`) and Soft-Delete Preservation (`BR-COMM-004`)?
+* **Enforcing Max 3-Level Nesting Depth (`BR-COMM-003`)**:
+  * Deeply nested threads cause severe visual and cognitive degradation on mobile screens.
+  * When a reply is submitted, `comment.service.ts` queries the parent comment's depth:
+    * Level 1: Top-level comment on post (`parentId === null`, `depth = 1`).
+    * Level 2: Direct reply to a top-level comment (`parent.parentId === null`, `depth = 2`).
+    * Level 3: Reply to a Level 2 comment (`depth = 3`).
+    * Any attempt to reply to a Level 3 comment throws `ValidationError('Maximum reply depth of 3 levels exceeded')` at the service boundary.
+* **Soft-Delete with Tombstones (`BR-COMM-004`)**:
+  * **The Problem**: If an author deletes a comment that has 10 child replies, hard deleting (`DELETE FROM comments`) cascades and wipes out the entire conversation subtree, confusing readers.
+  * **The Solution**: We execute a soft-delete: set `isDeleted = true` and update `content = "[This comment was deleted by author]"`.
+  * **Integrity**: The record remains in the database so foreign keys (`parentId`) remain valid, child replies are preserved in context, and author PII is safely masked.
+
+### Q106: How do you prevent Race Conditions and Double-Voting in a High-Concurrency Upvote System (`BR-COMM-002`)?
+* **Database Unique Constraints**:
+  * We enforce a composite unique index on `post_likes`: `@@unique([userId, postId])` and on `comment_likes`: `@@unique([userId, commentId])`.
+  * This guarantees at the storage engine level that a user can never vote twice on the same item, even if two concurrent requests hit different server pods simultaneously.
+* **Atomic Transactions & Vote Inversion**:
+  * To toggle a vote, `post.repository.ts` uses an atomic `prisma.$transaction`:
+    1. Query existing like: `findUnique({ userId_postId: { userId, postId } })`.
+    2. If exists: `delete(like)` and atomic decrement: `post.update({ data: { likeCount: { decrement: 1 } } })`.
+    3. If absent: `create(like)` and atomic increment: `post.update({ data: { likeCount: { increment: 1 } } })`.
+  * Using SQL `{ increment: 1 }` / `{ decrement: 1 }` prevents lost update concurrency anomalies (e.g. read count 5, write count 6 from two threads ending up with 6 instead of 7).
+
+### Q107: What is Industrial Brutalism in Web Architecture, and why use Vanilla HTML/CSS/JS over heavy SPA frameworks?
+* **Design Philosophy: Information Density vs Consumer Fluff**:
+  * Modern consumer SPAs waste 70-80% of screen space on oversized cards, decorative whitespace, soft drop shadows, and heavy rounded borders.
+  * Industrial Brutalism (Swiss typography, tactile telemetry, Old Reddit layout) prioritizes raw information density, rigid mathematical grids (`display: grid; gap: 1px;`), high-contrast unbleached newsprint substrates (`#F4F4F0`), carbon ink (`#111111`), and zero border-radius (`0px`).
+* **Zero-Framework Architecture Benefits**:
+  * **No Hydration Penalty**: Modern React/Next.js apps ship megabytes of JavaScript, execute costly client-side Virtual DOM hydration, and suffer from Layout Shift (CLS) and high Time-to-Interactive (TTI).
+  * **Zero Dependency Vulnerabilities**: Serving raw HTML/CSS/JS directly via Express static middleware eliminates build-chain supply-chain attacks, webpack/vite runtime overhead, and complex client bundle versioning.
+  * **Deterministic Performance**: Native DOM manipulation executes in microseconds with negligible CPU and memory footprints.
+

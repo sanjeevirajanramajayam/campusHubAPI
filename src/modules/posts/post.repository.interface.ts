@@ -15,6 +15,7 @@ export interface UpdatePostDTO {
 
 export interface PostQueryFilters {
   tag?: string;
+  clubId?: string;
   search?: string;
   sortBy?: 'latest' | 'popular';
   limit?: number;

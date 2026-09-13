@@ -34,6 +34,7 @@ export class PostService {
     const { posts, totalCount } = await this.postRepository.findAll(
       {
         tag: query.tag,
+        clubId: query.clubId,
         search: query.search,
         sortBy: query.sortBy,
         limit: query.limit,

@@ -71,6 +71,7 @@ export const postQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(10),
   tag: z.string().trim().toLowerCase().optional(),
+  clubId: z.string().trim().toLowerCase().optional(),
   search: z.string().trim().optional(),
   sortBy: z.enum(['latest', 'popular']).default('latest'),
 });

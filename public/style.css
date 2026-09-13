@@ -773,3 +773,22 @@ body {
   gap: 4px;
   margin-top: 40px;
 }
+
+/* Real-Time Telemetry Flash */
+.pulse-highlight {
+  animation: pulse-flash 0.8s ease-in-out;
+}
+
+@keyframes pulse-flash {
+  0% {
+    background-color: var(--accent-red);
+    color: #ffffff;
+  }
+  50% {
+    background-color: #ffcccc;
+    color: var(--accent-red);
+  }
+  100% {
+    background-color: transparent;
+  }
+}

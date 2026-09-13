@@ -41,7 +41,14 @@ async function apiRequest(endpoint, options = {}) {
 
     const data = await res.json();
     if (!res.ok) {
-      const errorMsg = data.message || (data.details && JSON.stringify(data.details)) || 'API request failed';
+      if (res.status === 401) {
+        logout();
+      }
+      const errorMsg =
+        data.error?.message ||
+        data.message ||
+        (data.details && JSON.stringify(data.details)) ||
+        'API request failed';
       throw new Error(errorMsg);
     }
     return data;
@@ -99,13 +106,13 @@ function renderClubNavigation() {
   // Top Nav chips
   let navHtml = `
     <span class="nav-prefix">CHANNELS &gt;&gt;</span>
-    <a href="#" class="club-chip ${state.currentClubId === '' ? 'active' : ''}" data-club-id="">c/all</a>
+    <a href="#" class="club-chip ${state.currentClubId === '' ? 'active' : ''}" data-tag="">c/all</a>
   `;
 
   // Sidebar list
   let sidebarHtml = `
     <li>
-      <a href="#" class="club-item-link ${state.currentClubId === '' ? 'active' : ''}" data-club-id="">
+      <a href="#" class="club-item-link ${state.currentClubId === '' ? 'active' : ''}" data-tag="">
         <span><strong>c/all</strong> (Campus Wide)</span>
         <span>&gt;&gt;</span>
       </a>
@@ -113,14 +120,14 @@ function renderClubNavigation() {
   `;
 
   state.clubs.forEach((club) => {
-    const slug = club.slug || club.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const isActive = state.currentClubId === club.id;
+    const slug = (club.slug || club.name.toLowerCase().replace(/[^a-z0-9]/g, '')).toLowerCase();
+    const isActive = state.currentClubId === slug;
     navHtml += `
-      <a href="#" class="club-chip ${isActive ? 'active' : ''}" data-club-id="${club.id}">c/${escapeHtml(slug)}</a>
+      <a href="#" class="club-chip ${isActive ? 'active' : ''}" data-tag="${slug}">c/${escapeHtml(slug)}</a>
     `;
     sidebarHtml += `
       <li>
-        <a href="#" class="club-item-link ${isActive ? 'active' : ''}" data-club-id="${club.id}">
+        <a href="#" class="club-item-link ${isActive ? 'active' : ''}" data-tag="${slug}">
           <span><strong>c/${escapeHtml(slug)}</strong> (${escapeHtml(club.name)})</span>
           <span>&gt;&gt;</span>
         </a>
@@ -135,14 +142,14 @@ function renderClubNavigation() {
   navBar.querySelectorAll('.club-chip').forEach((chip) => {
     chip.addEventListener('click', (e) => {
       e.preventDefault();
-      setClubFilter(chip.dataset.clubId, chip.textContent);
+      setClubFilter(chip.dataset.tag, chip.textContent);
     });
   });
 
   sidebarList.querySelectorAll('.club-item-link').forEach((link) => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      setClubFilter(link.dataset.clubId, link.querySelector('strong').textContent);
+      setClubFilter(link.dataset.tag, link.querySelector('strong').textContent);
     });
   });
 }
@@ -153,21 +160,22 @@ function renderClubSelectDropdown() {
 
   let optionsHtml = '<option value="">-- SELECT TARGET CHANNEL --</option>';
   state.clubs.forEach((club) => {
-    optionsHtml += `<option value="${club.id}">${escapeHtml(club.name)}</option>`;
+    const slug = (club.slug || club.name.toLowerCase().replace(/[^a-z0-9]/g, '')).toLowerCase();
+    optionsHtml += `<option value="${slug}">c/${escapeHtml(slug)} (${escapeHtml(club.name)})</option>`;
   });
   select.innerHTML = optionsHtml;
 }
 
-function setClubFilter(clubId, label) {
-  state.currentClubId = clubId;
+function setClubFilter(tagSlug, label) {
+  state.currentClubId = tagSlug || '';
   state.page = 1;
 
   const banner = document.getElementById('filter-banner');
   const labelEl = document.getElementById('current-filter-label');
 
-  if (clubId) {
+  if (state.currentClubId) {
     banner.style.display = 'flex';
-    labelEl.textContent = label || clubId;
+    labelEl.textContent = label || `c/${state.currentClubId}`;
   } else {
     banner.style.display = 'none';
   }
@@ -187,8 +195,9 @@ async function loadPosts() {
     const params = new URLSearchParams({
       page: state.page,
       limit: state.limit,
+      sortBy: state.currentSort === 'top' ? 'popular' : 'latest',
     });
-    if (state.currentClubId) params.append('clubId', state.currentClubId);
+    if (state.currentClubId) params.append('tag', state.currentClubId);
     if (state.searchQuery) params.append('search', state.searchQuery);
 
     const res = await apiRequest(`/posts?${params.toString()}`);
@@ -377,7 +386,8 @@ async function togglePostLike(postId) {
 
   try {
     const res = await apiRequest(`/posts/${postId}/like`, { method: 'POST' });
-    const { liked, likeCount } = res.data;
+    const liked = res.data.liked;
+    const likeCount = res.data.totalLikes ?? res.data.likeCount;
 
     // Update in local state
     const post = state.posts.find((p) => p.id === postId);
@@ -409,7 +419,8 @@ async function toggleCommentLike(postId, commentId) {
 
   try {
     const res = await apiRequest(`/posts/${postId}/comments/${commentId}/like`, { method: 'POST' });
-    const { liked, likeCount } = res.data;
+    const liked = res.data.liked;
+    const likeCount = res.data.totalLikes ?? res.data.likeCount;
 
     const countEl = document.getElementById(`comment-votes-${commentId}`);
     const btnEl = document.getElementById(`comment-upvote-${commentId}`);
@@ -953,7 +964,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       await apiRequest('/posts', {
         method: 'POST',
-        body: JSON.stringify({ title, content, clubId }),
+        body: JSON.stringify({ title, content, tags: [clubId] }),
       });
       closePostModal();
       document.getElementById('create-post-form').reset();
@@ -1007,4 +1018,122 @@ document.addEventListener('DOMContentLoaded', () => {
       loadPosts();
     }
   });
+
+  // Initialize Real-Time Server-Sent Events stream
+  initRealtimeStream();
 });
+
+// ============================================================================
+// 12. REAL-TIME TELEMETRY (SERVER-SENT EVENTS)
+// ============================================================================
+function initRealtimeStream() {
+  const badge = document.getElementById('sse-status-badge');
+
+  try {
+    const eventSource = new EventSource('/api/v1/posts/stream');
+
+    eventSource.onopen = () => {
+      if (badge) {
+        badge.textContent = '[ SSE: LIVE ]';
+        badge.className = 'badge green';
+      }
+    };
+
+    eventSource.onerror = () => {
+      if (badge) {
+        badge.textContent = '[ SSE: RECONNECTING ]';
+        badge.className = 'badge red';
+      }
+    };
+
+    eventSource.onmessage = (e) => {
+      try {
+        const payload = JSON.parse(e.data);
+        handleRealtimeEvent(payload);
+      } catch {
+        // Ping comments
+      }
+    };
+  } catch (err) {
+    console.warn('Real-time SSE not supported or blocked:', err);
+  }
+}
+
+function handleRealtimeEvent(payload) {
+  const { type, data } = payload;
+  if (!data) return;
+
+  switch (type) {
+    case 'POST_VOTED': {
+      const { postId, likeCount } = data;
+      const countEl = document.querySelector(`.post-vote-count[data-post-id="${postId}"]`);
+      if (countEl) {
+        countEl.textContent = likeCount;
+        countEl.classList.add('pulse-highlight');
+        setTimeout(() => countEl.classList.remove('pulse-highlight'), 800);
+      }
+      const post = state.posts.find((p) => p.id === postId);
+      if (post) post.likeCount = likeCount;
+      break;
+    }
+
+    case 'POST_CREATED': {
+      const { post } = data;
+      if (!post) break;
+      if (state.page === 1 && !state.posts.some((p) => p.id === post.id)) {
+        state.posts.unshift(post);
+        renderPosts();
+        const firstPost = document.querySelector(`.post-item[data-post-id="${post.id}"]`);
+        if (firstPost) {
+          firstPost.classList.add('pulse-highlight');
+          setTimeout(() => firstPost.classList.remove('pulse-highlight'), 1200);
+        }
+      }
+      break;
+    }
+
+    case 'POST_DELETED': {
+      const { postId } = data;
+      const post = state.posts.find((p) => p.id === postId);
+      if (post) {
+        post.isDeleted = true;
+        post.content = '[This post was deleted by author]';
+        renderPosts();
+      }
+      break;
+    }
+
+    case 'COMMENT_CREATED': {
+      const { postId } = data;
+      const post = state.posts.find((p) => p.id === postId);
+      if (post) {
+        post.commentCount = (post.commentCount || 0) + 1;
+        const btn = document.querySelector(`.toggle-comments-btn[data-post-id="${postId}"]`);
+        if (btn) btn.textContent = `[ ${post.commentCount} COMMENTS ]`;
+      }
+      if (state.expandedPostId === postId) {
+        loadComments(postId);
+      }
+      break;
+    }
+
+    case 'COMMENT_VOTED': {
+      const { commentId, likeCount } = data;
+      const countEl = document.getElementById(`comment-votes-${commentId}`);
+      if (countEl) {
+        countEl.textContent = likeCount;
+        countEl.classList.add('pulse-highlight');
+        setTimeout(() => countEl.classList.remove('pulse-highlight'), 800);
+      }
+      break;
+    }
+
+    case 'COMMENT_DELETED': {
+      const { postId } = data;
+      if (state.expandedPostId === postId) {
+        loadComments(postId);
+      }
+      break;
+    }
+  }
+}

@@ -29,6 +29,7 @@ export const createPostRouter = (): Router => {
 
   // --- Post Routes ---
   router.get('/', validate(postQuerySchema, 'query'), postController.list);
+  router.get('/stream', postController.stream);
   router.get('/:id', postController.getById);
   router.post('/', authenticate, validate(createPostSchema), postController.create);
   router.patch('/:id', authenticate, validate(updatePostSchema), postController.update);

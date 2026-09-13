@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { CommentService } from './comment.service.js';
 import type { CreateCommentInput, UpdateCommentInput } from './post.dto.js';
+import { feedEventService } from '../../infrastructure/events/feed-event.service.js';
 
 export class CommentController {
   constructor(private readonly commentService: CommentService) {}
@@ -12,6 +13,8 @@ export class CommentController {
       const authorId = req.user!.id;
 
       const comment = await this.commentService.createComment(postId, input, authorId);
+
+      void feedEventService.publishEvent('COMMENT_CREATED', { postId, comment });
 
       res.status(201).json({
         success: true,
@@ -58,11 +61,14 @@ export class CommentController {
 
   delete = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const postId = req.params.postId as string;
       const commentId = req.params.commentId as string;
       const userId = req.user!.id;
       const userRole = req.user!.role;
 
       await this.commentService.deleteComment(commentId, userId, userRole);
+
+      void feedEventService.publishEvent('COMMENT_DELETED', { postId, commentId });
 
       res.status(200).json({
         success: true,
@@ -75,10 +81,18 @@ export class CommentController {
 
   toggleLike = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const postId = req.params.postId as string;
       const commentId = req.params.commentId as string;
       const userId = req.user!.id;
 
       const result = await this.commentService.toggleCommentLike(commentId, userId);
+
+      void feedEventService.publishEvent('COMMENT_VOTED', {
+        postId,
+        commentId,
+        likeCount: result.totalLikes,
+        liked: result.liked,
+      });
 
       res.status(200).json({
         success: true,

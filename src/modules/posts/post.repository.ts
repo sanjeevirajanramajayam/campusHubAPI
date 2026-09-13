@@ -64,8 +64,9 @@ export class PrismaPostRepository implements IPostRepository {
       isDeleted: false,
     };
 
-    if (filters.tag) {
-      whereClause.tags = { has: filters.tag };
+    const targetTag = filters.tag || filters.clubId;
+    if (targetTag) {
+      whereClause.tags = { has: targetTag.toLowerCase() };
     }
 
     if (filters.search) {
