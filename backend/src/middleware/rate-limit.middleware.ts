@@ -32,7 +32,7 @@ export function rateLimit(options: RateLimitOptions) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const identifier = keyGenerator
       ? keyGenerator(req)
-      : (req.user?.id || req.ip || req.socket.remoteAddress || 'anonymous');
+      : req.user?.id || req.ip || req.socket.remoteAddress || 'anonymous';
 
     const key = `rate_limit:${scope}:${identifier}`;
     const now = Date.now();
@@ -49,9 +49,8 @@ export function rateLimit(options: RateLimitOptions) {
 
       const results = await pipeline.exec();
       // results[2] is the zcard execution: [error, count]
-      const requestCount = (results && results[2] && typeof results[2][1] === 'number')
-        ? (results[2][1] as number)
-        : 1;
+      const requestCount =
+        results && results[2] && typeof results[2][1] === 'number' ? (results[2][1] as number) : 1;
 
       const remaining = Math.max(0, maxRequests - requestCount);
       const resetTime = Math.ceil((now + windowSeconds * 1000) / 1000);

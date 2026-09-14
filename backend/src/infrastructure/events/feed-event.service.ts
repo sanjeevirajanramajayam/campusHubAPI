@@ -47,7 +47,10 @@ export class FeedEventService {
       this.subscriberClient = redis.duplicate();
       this.subscriberClient.subscribe(REDIS_FEED_CHANNEL, (err) => {
         if (err) {
-          logger.warn({ err }, 'Could not subscribe to Redis feed channel, using local EventEmitter fallback');
+          logger.warn(
+            { err },
+            'Could not subscribe to Redis feed channel, using local EventEmitter fallback',
+          );
           return;
         }
         this.isRedisSubscribed = true;
@@ -65,7 +68,10 @@ export class FeedEventService {
         }
       });
     } catch (err) {
-      logger.warn({ err }, 'Redis duplicate subscriber initialization failed; operating in local mode');
+      logger.warn(
+        { err },
+        'Redis duplicate subscriber initialization failed; operating in local mode',
+      );
     }
   }
 

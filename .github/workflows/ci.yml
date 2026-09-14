@@ -87,19 +87,19 @@ jobs:
         run: pnpm lint
 
       - name: Validate Prisma Schema
-        run: pnpm prisma validate
+        run: pnpm --filter backend exec prisma validate
 
       - name: Generate Prisma Client
-        run: pnpm prisma generate
+        run: pnpm --filter backend run prisma:generate
 
       - name: Push Schema to CI PostgreSQL Container
-        run: pnpm prisma db push --accept-data-loss
+        run: pnpm --filter backend exec prisma db push --accept-data-loss
 
       - name: TypeScript Typecheck (Zero Tolerance)
         run: pnpm typecheck
 
       - name: Run Unit Tests with Coverage Gate
-        run: pnpm vitest run tests/unit --coverage
+        run: pnpm --filter backend exec vitest run tests/unit --coverage
 
       - name: Run Integration Tests (Real PostgreSQL & Redis)
         run: pnpm test:integration

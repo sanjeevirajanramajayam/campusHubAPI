@@ -76,7 +76,12 @@ export class PrismaPostRepository implements IPostRepository {
   async findAll(
     filters: PostQueryFilters,
     callerId?: string,
-  ): Promise<{ posts: PostWithDetails[]; totalCount: number; nextCursor?: string | null; hasMore: boolean }> {
+  ): Promise<{
+    posts: PostWithDetails[];
+    totalCount: number;
+    nextCursor?: string | null;
+    hasMore: boolean;
+  }> {
     const whereClause: Record<string, unknown> = {
       isDeleted: false,
     };
@@ -96,7 +101,11 @@ export class PrismaPostRepository implements IPostRepository {
 
     const orderBy =
       filters.sortBy === 'popular'
-        ? [{ likes: { _count: 'desc' as const } }, { createdAt: 'desc' as const }, { id: 'desc' as const }]
+        ? [
+            { likes: { _count: 'desc' as const } },
+            { createdAt: 'desc' as const },
+            { id: 'desc' as const },
+          ]
         : [{ createdAt: 'desc' as const }, { id: 'desc' as const }];
 
     const take = filters.limit ?? 10;
@@ -148,7 +157,9 @@ export class PrismaPostRepository implements IPostRepository {
     const lastItem = rawPosts[rawPosts.length - 1];
     const nextCursor = hasMore && lastItem ? this.encodeCursor(lastItem) : null;
 
-    const posts: PostWithDetails[] = (rawPosts as unknown as (PostWithDetails & { likes?: { id: string }[] })[]).map((post) => {
+    const posts: PostWithDetails[] = (
+      rawPosts as unknown as (PostWithDetails & { likes?: { id: string }[] })[]
+    ).map((post) => {
       const { likes, ...rest } = post;
       return {
         ...rest,
