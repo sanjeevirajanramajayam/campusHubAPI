@@ -13,7 +13,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
 
   const triggerSearch = (text: string) => {
     if (abortControllerRef.current) {
-      abortControllerRef.current.abort(); // Cancel previous in-flight request
+      abortControllerRef.current.abort(); // Cancel previous in-flight search request
     }
     abortControllerRef.current = new AbortController();
     onSearch(text, abortControllerRef.current.signal);
@@ -36,25 +36,24 @@ export function SearchBar({ onSearch }: SearchBarProps) {
   };
 
   return (
-    <div className="search-box">
+    <div className="search-bar">
       <input
         type="text"
         id="search-input"
-        className="brutal-input"
-        placeholder="SEARCH DISPATCHES (DEBOUNCED)..."
+        placeholder="SEARCH POSTS (DEBOUNCED)..."
         value={query}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
       />
       <button
         id="search-btn"
-        className="brutal-btn"
+        className="brutal-btn mini"
         onClick={() => {
           if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
           triggerSearch(query.trim());
         }}
       >
-        [ SEARCH ]
+        [ FIND ]
       </button>
     </div>
   );

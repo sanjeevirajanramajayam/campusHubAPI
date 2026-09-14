@@ -47,16 +47,16 @@ export function ProfileModal({ user, onClose, onUserUpdated }: ProfileModalProps
   };
 
   return (
-    <div className="brutal-modal-overlay">
+    <div className="modal-overlay">
       <div className="brutal-modal">
-        <div className="brutal-modal-header">
-          <span>[ EDIT OPERATOR PROFILE TELEMETRY ]</span>
-          <button className="modal-close-btn" onClick={onClose}>
-            X
+        <div className="modal-header">
+          <span>[ OPERATOR PROFILE SETTINGS ]</span>
+          <button className="close-btn" onClick={onClose}>
+            &times;
           </button>
         </div>
         <form onSubmit={handleSubmit} className="modal-body">
-          <label className="form-label">OPERATOR CALLSIGN (FULL NAME)</label>
+          <label className="form-label">OPERATOR CALLSIGN (NAME)</label>
           <input
             type="text"
             className="brutal-input"
@@ -74,15 +74,17 @@ export function ProfileModal({ user, onClose, onUserUpdated }: ProfileModalProps
             onChange={(e) => setAvatarUrl(e.target.value)}
           />
 
-          <div style={{ margin: '16px 0 8px 0', borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-            <span className="telemetry-mono text-muted">[ RE-AUTHENTICATE FOR PASSWORD CHANGE ]</span>
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '6px' }}>
+            <span className="telemetry-label" style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+              [ RE-AUTHENTICATE FOR PASSWORD CHANGE ]
+            </span>
           </div>
 
           <label className="form-label">CURRENT PASSWORD</label>
           <input
             type="password"
             className="brutal-input"
-            placeholder="Required only to set new password"
+            placeholder="Enter current password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
           />
@@ -97,9 +99,9 @@ export function ProfileModal({ user, onClose, onUserUpdated }: ProfileModalProps
             minLength={8}
           />
 
-          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button type="submit" className="brutal-btn full red-btn" disabled={loading}>
-              {loading ? '[ PERSISTING... ]' : '[ SAVE SETTINGS ]'}
+              {loading ? '[ SAVING... ]' : '[ SAVE SETTINGS ]'}
             </button>
             <button type="button" className="brutal-btn full" onClick={onClose}>
               [ CANCEL ]

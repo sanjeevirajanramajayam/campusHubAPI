@@ -43,14 +43,18 @@ export function EventsSchedule({
   };
 
   return (
-    <div className="events-view">
-      <div className="directory-header" style={{ marginBottom: '16px' }}>
-        <h2 className="section-title">CAMPUS EVENTS &amp; CAPACITY CONCURRENCY</h2>
-        <p className="section-desc">ACID PESSIMISTIC LOCKING GUARANTEES ZERO OVERSELLING</p>
+    <div className="feed-section">
+      <div className="section-top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <div className="section-title-wrap">
+          <h2 className="section-heading" style={{ fontSize: '14px', fontWeight: 700 }}>
+            [ CAMPUS EVENTS &amp; HIGH-CONCURRENCY TICKETING ]
+          </h2>
+          <span className="sub-counter text-muted">[{events.length} ACTIVE EVENTS]</span>
+        </div>
       </div>
 
       {/* Events Grid */}
-      <div className="directory-grid" style={{ marginBottom: '32px' }}>
+      <div className="cards-grid">
         {events.map((event) => {
           const isSoldOut = event.registeredCount >= event.capacity;
           const pct = Math.min(100, Math.round((event.registeredCount / event.capacity) * 100));
@@ -91,28 +95,6 @@ export function EventsSchedule({
             </div>
           );
         })}
-      </div>
-
-      {/* Ticket Wallet */}
-      <div className="ticket-wallet-section">
-        <h3 className="section-title" style={{ fontSize: '14px', marginBottom: '12px' }}>
-          [ ISSUED EVENT PASSES (LOCAL WALLET) ]
-        </h3>
-
-        {userTickets.length === 0 ? (
-          <div className="empty-box">[ NO PASSES ISSUED YET. CLAIM AN RSVP ABOVE. ]</div>
-        ) : (
-          <div className="tickets-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-            {userTickets.map((t, idx) => (
-              <div key={t.id || idx} className="ticket-pass">
-                <div className="ticket-pass-title">{t.eventTitle || 'Campus Keynote'}</div>
-                <div className="ticket-pass-code">{t.ticketCode}</div>
-                <div className="ticket-barcode">||| | |||| | || ||| |||| |</div>
-                <div className="ticket-pass-time">ISSUED: {new Date(t.createdAt).toLocaleString()}</div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

@@ -38,59 +38,53 @@ export function PostCard({
 
   return (
     <article className="post-item" data-post-id={post.id}>
-      {/* VOTE CELL */}
-      <div className="vote-cell">
+      {/* 1. LEFT VOTE COLUMN */}
+      <div className="vote-col">
         <button
-          className={`vote-arrow up ${post.hasLiked ? 'voted' : ''}`}
+          className={`vote-btn ${post.hasLiked ? 'upvoted' : ''}`}
           title="Upvote dispatch"
           onClick={() => onVote(post.id)}
         >
           ▲
         </button>
-        <span className="post-vote-count" data-post-id={post.id}>
+        <span className={`vote-count ${post.hasLiked ? 'upvoted' : ''}`}>
           {post.likeCount}
         </span>
       </div>
 
-      {/* CONTENT CELL */}
-      <div className="post-content-cell">
-        <div className="post-meta-top">
-          <span className="post-channel-chip">c/{channelSlug}</span>
-          <span className="pipe">|</span>
-          <span className="post-author-name">u/{post.authorName}</span>
-          {post.authorRole === 'ADMIN' && <span className="badge red mini">[ ADMIN ]</span>}
-          {post.authorRole === 'CLUB_LEAD' && <span className="badge mini">[ LEAD ]</span>}
-          <span className="pipe">|</span>
-          <span className="telemetry-mono text-muted">{formatTime(post.createdAt)}</span>
+      {/* 2. RIGHT MAIN CONTENT COLUMN */}
+      <div className="post-main">
+        <div className="post-header-line">
+          <span className="post-badge">c/{channelSlug}</span>
+          <h2 className="post-title" onClick={() => onToggleComments(post.id)}>
+            {post.title}
+          </h2>
         </div>
 
-        <h2 className="post-headline">{post.title}</h2>
-        <div className="post-body-text">{post.content}</div>
-
-        <div className="post-tags-list">
-          {(post.tags || []).map((tag) => (
-            <span key={tag} className="tag-chip">
-              #{tag}
-            </span>
-          ))}
+        <div className="post-meta">
+          Submitted by <strong>u/{post.authorName}</strong>{' '}
+          {post.authorRole === 'ADMIN' && <span className="badge red">[ADMIN]</span>}{' '}
+          {post.authorRole === 'CLUB_LEAD' && <span className="badge">[LEAD]</span>}{' '}
+          <span className="pipe">|</span> {formatTime(post.createdAt)}
         </div>
 
-        <div className="post-actions-strip">
-          <button
-            className={`action-btn toggle-comments-btn ${isExpanded ? 'active' : ''}`}
-            onClick={() => onToggleComments(post.id)}
-          >
+        <div className={`post-body ${post.isDeleted ? 'tombstone' : ''}`}>
+          {post.content}
+        </div>
+
+        <div className="post-actions">
+          <button className="action-link" onClick={() => onToggleComments(post.id)}>
             [ {post.commentCount || 0} COMMENTS {isExpanded ? '▲' : '▼'} ]
           </button>
 
-          {isAuthor && (
+          {isAuthor && !post.isDeleted && (
             <>
               <span className="pipe">|</span>
-              <button className="action-btn" onClick={() => onEdit(post)}>
+              <button className="action-link" onClick={() => onEdit(post)}>
                 [ EDIT ]
               </button>
               <span className="pipe">|</span>
-              <button className="action-btn text-red" onClick={() => onDelete(post.id)}>
+              <button className="action-link delete" onClick={() => onDelete(post.id)}>
                 [ DELETE ]
               </button>
             </>

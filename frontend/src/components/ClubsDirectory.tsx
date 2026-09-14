@@ -66,20 +66,22 @@ export function ClubsDirectory({
   };
 
   return (
-    <div className="directory-view">
-      <div className="directory-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div>
-          <h2 className="section-title">CAMPUS CLUBS &amp; ORGANIZATIONS</h2>
-          <p className="section-desc">OFFICIAL CHARTERED STUDENT SOCIETIES</p>
+    <div className="feed-section">
+      <div className="section-top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <div className="section-title-wrap">
+          <h2 className="section-heading" style={{ fontSize: '14px', fontWeight: 700 }}>
+            [ CAMPUS CLUBS DIRECTORY &amp; CHARTER ]
+          </h2>
+          <span className="sub-counter text-muted">[{clubs.length} CHARTERED SOCIETIES]</span>
         </div>
         {currentUser && (
-          <button className="brutal-btn red-btn" onClick={() => setShowCharterModal(true)}>
-            [ + CHARTER NEW CLUB ]
+          <button className="brutal-btn red-btn mini" onClick={() => setShowCharterModal(true)}>
+            + CHARTER CLUB
           </button>
         )}
       </div>
 
-      <div className="directory-grid">
+      <div className="cards-grid">
         {clubs.map((club) => {
           const isMember = userMemberships.has(club.id);
           const memberCount = club._count?.members || 0;
@@ -90,19 +92,19 @@ export function ClubsDirectory({
                 <span className={`badge ${memberCount > 0 ? 'green' : ''}`}>[ {memberCount} MEMBERS ]</span>
               </div>
               <h3 className="directory-card-title">{club.name}</h3>
-              <p className="directory-card-desc">{club.description || 'No charter statement on file.'}</p>
+              <p className="directory-card-desc">{club.description || 'No charter description.'}</p>
               <div className="directory-card-actions">
                 {isMember ? (
                   <button className="brutal-btn mini red-btn" onClick={() => handleLeave(club.id)}>
-                    [ LEAVE CLUB ]
+                    [ LEAVE ]
                   </button>
                 ) : (
                   <button className="brutal-btn mini" onClick={() => handleJoin(club.id)}>
-                    [ JOIN CLUB ]
+                    [ JOIN ]
                   </button>
                 )}
                 <button className="brutal-btn mini" onClick={() => onViewClubFeed(club.slug)}>
-                  [ VIEW FEED &gt;&gt; ]
+                  [ FEED &gt;&gt; ]
                 </button>
               </div>
             </div>
@@ -112,12 +114,12 @@ export function ClubsDirectory({
 
       {/* Charter Modal */}
       {showCharterModal && (
-        <div className="brutal-modal-overlay">
-          <div className="brutal-modal">
-            <div className="brutal-modal-header">
+        <div className="modal-overlay">
+          <div className="modal-box brutal-modal">
+            <div className="modal-header">
               <span>[ CHARTER STUDENT CLUB ]</span>
-              <button className="modal-close-btn" onClick={() => setShowCharterModal(false)}>
-                X
+              <button className="close-btn" onClick={() => setShowCharterModal(false)}>
+                &times;
               </button>
             </div>
             <form onSubmit={handleCharterClub} className="modal-body">
@@ -132,9 +134,9 @@ export function ClubsDirectory({
               />
               <label className="form-label">DESCRIPTION</label>
               <textarea
-                className="brutal-input"
+                className="brutal-textarea"
                 rows={3}
-                placeholder="Mission statement and meeting times..."
+                placeholder="Mission statement and weekly meeting schedule..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 required
@@ -147,7 +149,7 @@ export function ClubsDirectory({
                 value={bannerUrl}
                 onChange={(e) => setBannerUrl(e.target.value)}
               />
-              <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                 <button type="submit" className="brutal-btn full red-btn">
                   [ SUBMIT CHARTER ]
                 </button>

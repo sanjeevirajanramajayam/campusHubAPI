@@ -85,24 +85,25 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
 
   const renderCommentItem = (item: CommentNode) => {
     const isAuthor = currentUser && (currentUser.id === item.authorId || currentUser.role === 'ADMIN');
-    const canReply = item.depth < 3; // Business Rule: Max 3-level depth
+    const canReply = item.depth < 3;
 
     return (
       <div key={item.id} className={`comment-node depth-${item.depth}`}>
-        <div className="comment-header">
-          <span className="telemetry-mono">u/{item.authorName}</span>
+        <div className="comment-meta">
+          <span className="comment-author">u/{item.authorName}</span>
+          <span className="comment-depth-tag">L{item.depth}</span>
           <span className="pipe">|</span>
-          <span className="telemetry-mono text-muted">{new Date(item.createdAt).toLocaleTimeString()}</span>
-          {item.isDeleted && <span className="badge red mini">[ TOMBSTONE ]</span>}
+          <span>{new Date(item.createdAt).toLocaleTimeString()}</span>
+          {item.isDeleted && <span className="badge red mini">[TOMBSTONE]</span>}
         </div>
 
-        <div className={`comment-body ${item.isDeleted ? 'text-muted italic' : ''}`}>
+        <div className={`comment-text ${item.isDeleted ? 'tombstone' : ''}`}>
           {item.content}
         </div>
 
         <div className="comment-actions">
           {!item.isDeleted && (
-            <button className="action-btn mini" onClick={() => handleVoteComment(item.id)}>
+            <button className="action-link" onClick={() => handleVoteComment(item.id)}>
               [ ▲ {item.likeCount} ]
             </button>
           )}
@@ -111,7 +112,7 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
             <>
               <span className="pipe">|</span>
               <button
-                className="action-btn mini"
+                className="action-link"
                 onClick={() => setReplyingToId(replyingToId === item.id ? null : item.id)}
               >
                 [ REPLY ]
@@ -122,7 +123,7 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
           {isAuthor && !item.isDeleted && (
             <>
               <span className="pipe">|</span>
-              <button className="action-btn mini text-red" onClick={() => handleDeleteComment(item.id)}>
+              <button className="action-link delete" onClick={() => handleDeleteComment(item.id)}>
                 [ DELETE ]
               </button>
             </>
@@ -131,18 +132,17 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
 
         {/* Reply form */}
         {replyingToId === item.id && (
-          <div className="reply-form" style={{ marginTop: '8px', paddingLeft: '12px' }}>
+          <div className="reply-form">
             <textarea
-              className="brutal-input"
+              className="brutal-textarea"
               rows={2}
               placeholder="ENTER REPLY..."
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
-              style={{ width: '100%', marginBottom: '4px' }}
             />
             <div style={{ display: 'flex', gap: '4px' }}>
               <button className="brutal-btn mini" onClick={() => handleCreateComment(item.id, replyText)}>
-                [ SUBMIT REPLY ]
+                [ TRANSMIT REPLY ]
               </button>
               <button className="brutal-btn mini red-btn" onClick={() => setReplyingToId(null)}>
                 [ CANCEL ]
@@ -153,7 +153,7 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
 
         {/* Nested replies */}
         {item.replies && item.replies.length > 0 && (
-          <div className="nested-replies" style={{ borderLeft: '2px solid var(--border-color)', paddingLeft: '8px' }}>
+          <div className="nested-replies">
             {item.replies.map((reply) => renderCommentItem(reply))}
           </div>
         )}
@@ -163,32 +163,27 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
 
   return (
     <div className="comment-drawer">
-      <div className="comment-drawer-header">
-        <span className="telemetry-mono font-bold">[ THREADED DISCUSSION TELEMETRY ]</span>
-        <span className="telemetry-mono text-muted">(MAX DEPTH: 3 LEVELS)</span>
-      </div>
-
-      {/* Top-level comment box */}
-      <div className="comment-form-box">
+      {/* Input box */}
+      <div className="comment-input-box">
         <textarea
-          className="brutal-input"
           rows={2}
           placeholder="DISPATCH TELEMETRY COMMENT..."
           value={newCommentText}
           onChange={(e) => setNewCommentText(e.target.value)}
-          style={{ width: '100%', marginBottom: '6px' }}
         />
-        <button className="brutal-btn" onClick={() => handleCreateComment(null, newCommentText)}>
-          [ TRANSMIT COMMENT ]
-        </button>
+        <div style={{ marginTop: '6px' }}>
+          <button className="brutal-btn mini" onClick={() => handleCreateComment(null, newCommentText)}>
+            [ TRANSMIT COMMENT ]
+          </button>
+        </div>
       </div>
 
       {loading ? (
-        <div className="loading-box">[ LOADING THREADS... ]</div>
+        <div className="loading-box">[ LOADING THREAD TELEMETRY... ]</div>
       ) : comments.length === 0 ? (
-        <div className="empty-box">[ NO COMMENTS IN RECORD. BE THE FIRST. ]</div>
+        <div className="empty-box">[ NO COMMENTS IN RECORD ]</div>
       ) : (
-        <div className="comments-tree">{comments.map((c) => renderCommentItem(c))}</div>
+        <div className="comment-tree">{comments.map((c) => renderCommentItem(c))}</div>
       )}
     </div>
   );

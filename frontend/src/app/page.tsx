@@ -85,7 +85,7 @@ export default function CampusHubApp() {
       const storedTickets = localStorage.getItem('campushub_user_tickets');
       if (storedTickets) setUserTickets(JSON.parse(storedTickets));
     } catch {
-      // Ignore JSON parse errors
+      // Ignore parse error
     }
   }, []);
 
@@ -149,7 +149,6 @@ export default function CampusHubApp() {
       alert('Authentication required to upvote.');
       return;
     }
-    // Optimistic toggle
     setPosts((prev) =>
       prev.map((p) =>
         p.id === postId
@@ -166,7 +165,7 @@ export default function CampusHubApp() {
       await apiRequest(`/posts/${postId}/like`, { method: 'POST' });
     } catch (err: any) {
       alert(`Vote failed: ${err.message}`);
-      loadPosts(); // Revert on failure
+      loadPosts();
     }
   };
 
@@ -286,177 +285,163 @@ export default function CampusHubApp() {
   };
 
   return (
-    <div className="campushub-root">
-      {/* 1. TOP TELEMETRY BAR */}
+    <div className="campushub-shell">
+      {/* 1. TOP TICKER */}
       <TickerBar sseStatus={sseStatus} />
 
       {/* 2. CHANNELS SUBREDDIT NAV */}
       <SubredditNav
         clubs={clubs}
         currentClubId={currentClubId}
-        onSelectClub={(slug) => setCurrentClubId(slug)}
+        onSelectClub={(slug) => {
+          setCurrentClubId(slug);
+          setCurrentView('feed');
+        }}
       />
 
-      {/* 3. HERO STRIP */}
-      <header className="hero-strip">
-        <h1 className="logo-title">CAMPUSHUB // TACTICAL FEED &amp; FORUM</h1>
-        <p className="logo-sub">
-          INDUSTRIAL INFORMATION DENSITY // ZERO FRAMEWORK FLUFF // PRODUCTION ACID ARCHITECTURE
-        </p>
-      </header>
+      {/* 3. HERO STRIP WITH INTEGRATED MODULE NAV */}
+      <div className="hero-strip">
+        <div className="hero-titles">
+          <h1 className="logo-title">CAMPUS BULLETIN // BOARD</h1>
+          <p className="logo-sub">
+            TACTICAL COMMUNITY FEED &bull; CLUB DIRECTORY &bull; HIGH-CONCURRENCY TICKETING
+          </p>
+        </div>
+        <nav className="module-nav-bar">
+          <button
+            className={`module-tab-btn ${currentView === 'feed' ? 'active' : ''}`}
+            onClick={() => setCurrentView('feed')}
+          >
+            [ 01: BULLETIN FEED ]
+          </button>
+          <button
+            className={`module-tab-btn ${currentView === 'clubs' ? 'active' : ''}`}
+            onClick={() => setCurrentView('clubs')}
+          >
+            [ 02: CLUBS DIRECTORY ({clubs.length}) ]
+          </button>
+          <button
+            className={`module-tab-btn ${currentView === 'events' ? 'active' : ''}`}
+            onClick={() => setCurrentView('events')}
+          >
+            [ 03: CAMPUS EVENTS &amp; TICKETS ({events.length}) ]
+          </button>
+        </nav>
+      </div>
 
-      {/* 4. MAIN LAYOUT GRID */}
-      <div className="main-layout">
-        {/* LEFT COLUMN: FEED & DISPATCHES */}
-        <main className="feed-column">
-          {/* SEARCH BOX */}
-          <SearchBar onSearch={(q, signal) => setSearchQuery(q)} />
-
-          {/* MODULE VIEW TABS */}
-          <div className="module-tabs" style={{ display: 'flex', gap: '4px', margin: '12px 0' }}>
-            <button
-              className={`module-tab-btn brutal-btn ${currentView === 'feed' ? 'active' : ''}`}
-              onClick={() => setCurrentView('feed')}
-            >
-              [ 1. DISPATCH FEED ]
-            </button>
-            <button
-              className={`module-tab-btn brutal-btn ${currentView === 'clubs' ? 'active' : ''}`}
-              onClick={() => setCurrentView('clubs')}
-            >
-              [ 2. CLUBS DIRECTORY ({clubs.length}) ]
-            </button>
-            <button
-              className={`module-tab-btn brutal-btn ${currentView === 'events' ? 'active' : ''}`}
-              onClick={() => setCurrentView('events')}
-            >
-              [ 3. EVENTS SCHEDULE ({events.length}) ]
-            </button>
-          </div>
-
-          {/* VIEW 1: FEED */}
-          {currentView === 'feed' && (
-            <div className="feed-view-container">
-              {/* Filter Banner */}
-              {currentClubId && (
-                <div
-                  className="filter-banner"
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    background: '#e0ded8',
-                    border: '2px solid #111',
-                    marginBottom: '12px',
-                  }}
-                >
-                  <span className="telemetry-mono">
-                    FILTERED TO: <strong>c/{currentClubId}</strong>
-                  </span>
-                  <button className="action-btn mini text-red" onClick={() => setCurrentClubId('')}>
-                    [ CLEAR FILTER X ]
-                  </button>
-                </div>
-              )}
-
-              {/* Sort Bar */}
-              <div
-                className="sort-bar"
-                style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}
-              >
+      {/* 4. MAIN LAYOUT */}
+      <main className="main-layout">
+        {/* VIEW 1: BULLETIN FEED */}
+        {currentView === 'feed' && (
+          <section className="feed-section">
+            {/* Feed Controls (Sort tabs + Search bar) */}
+            <div className="feed-controls">
+              <div className="sort-tabs">
                 <button
-                  className={`sort-btn brutal-btn mini ${currentSort === 'newest' ? 'active' : ''}`}
+                  className={`sort-btn ${currentSort === 'newest' ? 'active' : ''}`}
                   onClick={() => setCurrentSort('newest')}
                 >
-                  [ NEWEST DISPATCHES ]
+                  [ NEWEST ]
                 </button>
                 <button
-                  className={`sort-btn brutal-btn mini ${currentSort === 'top' ? 'active' : ''}`}
+                  className={`sort-btn ${currentSort === 'top' ? 'active' : ''}`}
                   onClick={() => setCurrentSort('top')}
                 >
-                  [ TOP RATED ]
+                  [ TOP UPVOTED ]
                 </button>
               </div>
 
-              {/* Posts Feed */}
+              <SearchBar onSearch={(q, signal) => setSearchQuery(q)} />
+            </div>
+
+            {/* Active Filter Banner */}
+            {currentClubId && (
+              <div className="filter-banner">
+                <span>
+                  FILTER: <strong>c/{currentClubId}</strong>
+                </span>
+                <button className="text-link" onClick={() => setCurrentClubId('')}>
+                  [ RESET ]
+                </button>
+              </div>
+            )}
+
+            {/* Posts Stream */}
+            <div className="posts-stream">
               {loadingPosts ? (
-                <div className="loading-box">[ STREAMING TELEMETRY FEED... ]</div>
+                <div className="loading-box">[ QUERYING FEED TELEMETRY... ]</div>
               ) : posts.length === 0 ? (
-                <div className="empty-box">[ NO DISPATCHES FOUND FOR CURRENT CHANNEL/QUERY ]</div>
+                <div className="empty-box">[ NO DISPATCHES FOUND FOR CURRENT CHANNEL ]</div>
               ) : (
-                <div className="posts-stream">
-                  {posts.map((post) => (
-                    <React.Fragment key={post.id}>
-                      <PostCard
-                        post={post}
+                posts.map((post) => (
+                  <React.Fragment key={post.id}>
+                    <PostCard
+                      post={post}
+                      currentUser={currentUser}
+                      isExpanded={expandedPostId === post.id}
+                      onVote={handleVote}
+                      onToggleComments={(id) =>
+                        setExpandedPostId(expandedPostId === id ? null : id)
+                      }
+                      onEdit={(p) => {
+                        setEditingPost(p);
+                        setEditTitle(p.title);
+                        setEditContent(p.content);
+                      }}
+                      onDelete={handleDeletePost}
+                    />
+                    {expandedPostId === post.id && (
+                      <CommentDrawer
+                        postId={post.id}
                         currentUser={currentUser}
-                        isExpanded={expandedPostId === post.id}
-                        onVote={handleVote}
-                        onToggleComments={(id) =>
-                          setExpandedPostId(expandedPostId === id ? null : id)
-                        }
-                        onEdit={(p) => {
-                          setEditingPost(p);
-                          setEditTitle(p.title);
-                          setEditContent(p.content);
+                        onCommentCountChange={(pId, count) => {
+                          setPosts((prev) =>
+                            prev.map((p) => (p.id === pId ? { ...p, commentCount: count } : p)),
+                          );
                         }}
-                        onDelete={handleDeletePost}
                       />
-                      {expandedPostId === post.id && (
-                        <CommentDrawer
-                          postId={post.id}
-                          currentUser={currentUser}
-                          onCommentCountChange={(pId, count) => {
-                            setPosts((prev) =>
-                              prev.map((p) => (p.id === pId ? { ...p, commentCount: count } : p)),
-                            );
-                          }}
-                        />
-                      )}
-                    </React.Fragment>
-                  ))}
-                </div>
+                    )}
+                  </React.Fragment>
+                ))
               )}
             </div>
-          )}
+          </section>
+        )}
 
-          {/* VIEW 2: CLUBS */}
-          {currentView === 'clubs' && (
-            <ClubsDirectory
-              clubs={clubs}
-              currentUser={currentUser}
-              userMemberships={userMemberships}
-              onRefreshClubs={loadClubs}
-              onViewClubFeed={(slug) => {
-                setCurrentClubId(slug);
-                setCurrentView('feed');
-              }}
-            />
-          )}
+        {/* VIEW 2: CLUBS */}
+        {currentView === 'clubs' && (
+          <ClubsDirectory
+            clubs={clubs}
+            currentUser={currentUser}
+            userMemberships={userMemberships}
+            onRefreshClubs={loadClubs}
+            onViewClubFeed={(slug) => {
+              setCurrentClubId(slug);
+              setCurrentView('feed');
+            }}
+          />
+        )}
 
-          {/* VIEW 3: EVENTS */}
-          {currentView === 'events' && (
-            <EventsSchedule
-              events={events}
-              userTickets={userTickets}
-              currentUser={currentUser}
-              onRefreshEvents={loadEvents}
-              onTicketClaimed={(ticket) => {
-                const updated = [ticket, ...userTickets];
-                setUserTickets(updated);
-                localStorage.setItem('campushub_user_tickets', JSON.stringify(updated));
-              }}
-            />
-          )}
-        </main>
+        {/* VIEW 3: EVENTS */}
+        {currentView === 'events' && (
+          <EventsSchedule
+            events={events}
+            userTickets={userTickets}
+            currentUser={currentUser}
+            onRefreshEvents={loadEvents}
+            onTicketClaimed={(ticket) => {
+              const updated = [ticket, ...userTickets];
+              setUserTickets(updated);
+              localStorage.setItem('campushub_user_tickets', JSON.stringify(updated));
+            }}
+          />
+        )}
 
-        {/* RIGHT COLUMN: SIDEBAR */}
-        <aside className="sidebar-column">
-          {/* AUTHENTICATION CARD */}
-          <div className="sidebar-card">
-            <div className="card-header">
-              <span>[ IDENTITY TELEMETRY ]</span>
-            </div>
+        {/* SIDEBAR */}
+        <aside className="sidebar-section">
+          {/* AUTH CARD */}
+          <div className="brutal-card auth-card">
+            <div className="card-header">[ OPERATOR AUTHENTICATION ]</div>
             <div className="card-body">
               {currentUser ? (
                 <div className="user-session-view">
@@ -501,15 +486,15 @@ export default function CampusHubApp() {
                 </div>
               ) : (
                 <div className="auth-container">
-                  <div className="auth-tabs" style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                  <div className="auth-tabs">
                     <button
-                      className={`tab-btn brutal-btn mini ${authTab === 'login' ? 'active' : ''}`}
+                      className={`tab-btn ${authTab === 'login' ? 'active' : ''}`}
                       onClick={() => setAuthTab('login')}
                     >
                       LOGIN
                     </button>
                     <button
-                      className={`tab-btn brutal-btn mini ${authTab === 'register' ? 'active' : ''}`}
+                      className={`tab-btn ${authTab === 'register' ? 'active' : ''}`}
                       onClick={() => setAuthTab('register')}
                     >
                       REGISTER
@@ -519,7 +504,7 @@ export default function CampusHubApp() {
                   {authError && <div className="auth-status error">[ {authError} ]</div>}
 
                   {authTab === 'login' ? (
-                    <form onSubmit={handleLogin}>
+                    <form onSubmit={handleLogin} className="auth-form">
                       <label className="form-label">CAMPUS EMAIL</label>
                       <input
                         type="email"
@@ -538,12 +523,12 @@ export default function CampusHubApp() {
                         onChange={(e) => setAuthPassword(e.target.value)}
                         required
                       />
-                      <button type="submit" className="brutal-btn full red-btn" style={{ marginTop: '8px' }}>
+                      <button type="submit" className="brutal-btn full red-btn" style={{ marginTop: '6px' }}>
                         [ AUTHENTICATE ]
                       </button>
                     </form>
                   ) : (
-                    <form onSubmit={handleRegister}>
+                    <form onSubmit={handleRegister} className="auth-form">
                       <label className="form-label">FIRST NAME</label>
                       <input
                         type="text"
@@ -581,7 +566,7 @@ export default function CampusHubApp() {
                         required
                         minLength={8}
                       />
-                      <button type="submit" className="brutal-btn full" style={{ marginTop: '8px' }}>
+                      <button type="submit" className="brutal-btn full" style={{ marginTop: '6px' }}>
                         [ CREATE ACCOUNT ]
                       </button>
                     </form>
@@ -592,53 +577,89 @@ export default function CampusHubApp() {
           </div>
 
           {/* ACTION BUTTON */}
-          <div style={{ margin: '12px 0' }}>
-            <button
-              className="brutal-btn full red-btn"
-              onClick={() => {
-                if (!currentUser) alert('Authentication required to broadcast dispatches.');
-                else setShowCreatePostModal(true);
-              }}
-            >
-              [ + DISPATCH BROADCAST ]
-            </button>
+          <button
+            className="brutal-btn full red-btn"
+            style={{ padding: '10px 14px', fontSize: '12px' }}
+            onClick={() => {
+              if (!currentUser) alert('Authentication required to broadcast dispatches.');
+              else setShowCreatePostModal(true);
+            }}
+          >
+            + DISPATCH BROADCAST
+          </button>
+
+          {/* TICKET WALLET (SIDEBAR PREVIEW) */}
+          <div className="brutal-card wallet-card">
+            <div className="card-header highlight">[ TICKET WALLET ({userTickets.length}) ]</div>
+            <div className="card-body">
+              {userTickets.length === 0 ? (
+                <div className="empty-wallet">[ NO TICKETS ISSUED YET ]</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {userTickets.slice(0, 2).map((t, idx) => (
+                    <div key={t.id || idx} className="ticket-pass" style={{ margin: 0, padding: '8px' }}>
+                      <div className="ticket-pass-title" style={{ fontSize: '11px' }}>{t.eventTitle || 'Campus Keynote'}</div>
+                      <div className="ticket-pass-code" style={{ fontSize: '14px' }}>{t.ticketCode}</div>
+                    </div>
+                  ))}
+                  {userTickets.length > 2 && (
+                    <button className="action-link" onClick={() => setCurrentView('events')}>
+                      [ VIEW ALL {userTickets.length} PASSES &gt;&gt; ]
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* TELEMETRY SPECS */}
-          <div className="sidebar-card">
-            <div className="card-header">
-              <span>[ SYSTEM STATUS ]</span>
-            </div>
-            <div className="card-body telemetry-mono" style={{ fontSize: '11px', lineHeight: '1.6' }}>
-              <div>• ARCH: NEXT.JS 16 APP ROUTER</div>
-              <div>• BACKEND: EXPRESS 5 + PRISMA</div>
-              <div>• RATE LIMIT: REDIS ZSET SLIDING</div>
-              <div>• LOCKING: POSTGRES FOR UPDATE</div>
-              <div>• PUB/SUB: REDIS + EVENTSOURCE</div>
+          {/* SYSTEM TELEMETRY */}
+          <div className="brutal-card rules-card">
+            <div className="card-header">[ TELEMETRY &amp; ARCHITECTURE ]</div>
+            <div className="card-body rules-body">
+              <div className="rule-row">
+                <span className="rule-code">TECH-01</span>
+                <span className="rule-desc">Next.js 16 App Router + Turbopack</span>
+              </div>
+              <div className="rule-row">
+                <span className="rule-code">TECH-02</span>
+                <span className="rule-desc">Express 5 + Prisma + PostgreSQL</span>
+              </div>
+              <div className="rule-row">
+                <span className="rule-code">TECH-03</span>
+                <span className="rule-desc">Redis ZSet Sliding-Window Rate Limit</span>
+              </div>
+              <div className="rule-row">
+                <span className="rule-code">TECH-04</span>
+                <span className="rule-desc">PostgreSQL Row Locks (SELECT FOR UPDATE)</span>
+              </div>
+              <div className="rule-row">
+                <span className="rule-code">TECH-05</span>
+                <span className="rule-desc">Real-Time EventSource SSE Pub/Sub</span>
+              </div>
             </div>
           </div>
         </aside>
-      </div>
+      </main>
 
       {/* CREATE POST MODAL */}
       {showCreatePostModal && (
-        <div className="brutal-modal-overlay">
-          <div className="brutal-modal">
-            <div className="brutal-modal-header">
-              <span>[ DISPATCH NEW BROADCAST ]</span>
-              <button className="modal-close-btn" onClick={() => setShowCreatePostModal(false)}>
-                X
+        <div className="modal-overlay">
+          <div className="modal-box brutal-modal">
+            <div className="modal-header">
+              <span>[ SUBMIT DISPATCH TO FEED ]</span>
+              <button className="close-btn" onClick={() => setShowCreatePostModal(false)}>
+                &times;
               </button>
             </div>
             <form onSubmit={handleCreatePost} className="modal-body">
-              <label className="form-label">TARGET CHANNEL</label>
+              <label className="form-label">ASSIGN TO CLUB / CHANNEL</label>
               <select
-                className="brutal-input"
+                className="brutal-select"
                 value={newPostClub}
                 onChange={(e) => setNewPostClub(e.target.value)}
                 required
               >
-                <option value="">-- SELECT TARGET CHANNEL --</option>
+                <option value="">-- SELECT TARGET CLUB --</option>
                 {clubs.map((c) => (
                   <option key={c.id} value={c.slug}>
                     c/{c.slug} ({c.name})
@@ -646,19 +667,20 @@ export default function CampusHubApp() {
                 ))}
               </select>
 
-              <label className="form-label">HEADLINE / TITLE</label>
+              <label className="form-label">DISPATCH HEADLINE (TITLE)</label>
               <input
                 type="text"
                 className="brutal-input"
-                placeholder="Autonomous Drone Testing Schedule..."
+                placeholder="Clear, concise headline..."
                 value={newPostTitle}
                 onChange={(e) => setNewPostTitle(e.target.value)}
                 required
+                maxLength={150}
               />
 
               <label className="form-label">DISPATCH CONTENT</label>
               <textarea
-                className="brutal-input"
+                className="brutal-textarea"
                 rows={4}
                 placeholder="Full dispatch details..."
                 value={newPostContent}
@@ -666,13 +688,13 @@ export default function CampusHubApp() {
                 required
               />
 
-              <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                <button type="submit" className="brutal-btn full red-btn">
+              <div className="modal-footer">
+                <button type="submit" className="brutal-btn red-btn">
                   [ TRANSMIT DISPATCH ]
                 </button>
                 <button
                   type="button"
-                  className="brutal-btn full"
+                  className="brutal-btn"
                   onClick={() => setShowCreatePostModal(false)}
                 >
                   [ CANCEL ]
@@ -685,12 +707,12 @@ export default function CampusHubApp() {
 
       {/* EDIT POST MODAL */}
       {editingPost && (
-        <div className="brutal-modal-overlay">
-          <div className="brutal-modal">
-            <div className="brutal-modal-header">
+        <div className="modal-overlay">
+          <div className="modal-box brutal-modal">
+            <div className="modal-header">
               <span>[ EDIT BROADCAST DISPATCH ]</span>
-              <button className="modal-close-btn" onClick={() => setEditingPost(null)}>
-                X
+              <button className="close-btn" onClick={() => setEditingPost(null)}>
+                &times;
               </button>
             </div>
             <form onSubmit={handleSaveEdit} className="modal-body">
@@ -705,20 +727,20 @@ export default function CampusHubApp() {
 
               <label className="form-label">CONTENT</label>
               <textarea
-                className="brutal-input"
+                className="brutal-textarea"
                 rows={4}
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 required
               />
 
-              <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                <button type="submit" className="brutal-btn full red-btn">
+              <div className="modal-footer">
+                <button type="submit" className="brutal-btn red-btn">
                   [ SAVE CHANGES ]
                 </button>
                 <button
                   type="button"
-                  className="brutal-btn full"
+                  className="brutal-btn"
                   onClick={() => setEditingPost(null)}
                 >
                   [ CANCEL ]
@@ -729,7 +751,7 @@ export default function CampusHubApp() {
         </div>
       )}
 
-      {/* PROFILE SETTINGS MODAL */}
+      {/* PROFILE MODAL */}
       {showProfileModal && currentUser && (
         <ProfileModal
           user={currentUser}
