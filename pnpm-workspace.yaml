@@ -1,0 +1,8 @@
+packages:
+  - 'backend'
+  - 'frontend'
+
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
+  - '@prisma/engines'
