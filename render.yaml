@@ -1,17 +1,18 @@
 services:
   # ========================================================
-  # 1. API Web Service (Built from our multi-stage Dockerfile)
+  # 1. API Web Service (Express 5 REST API + SSE)
   # ========================================================
   - type: web
     name: campushub-api
     runtime: docker
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
     plan: free
     region: oregon
     healthCheckPath: /health
 
-    # Automatically apply Prisma database schema before launching new container
-    preDeployCommand: npx prisma db push --accept-data-loss
+    # Automatically synchronize Prisma database schema before launching new container
+    preDeployCommand: npx prisma db push --schema=./backend/prisma/schema.prisma --accept-data-loss
 
     envVars:
       - key: NODE_ENV
@@ -29,20 +30,43 @@ services:
           name: campushub-db
           property: connectionString
 
-      # Redis Configuration (Can point to Render Redis or Free Upstash Redis)
+      # Redis Configuration
       - key: REDIS_HOST
         value: localhost
       - key: REDIS_PORT
         value: 6379
 
-      # Render generates cryptographically secure 256-bit secrets automatically
+      # Cryptographically secure 256-bit secrets
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
 
+  # ========================================================
+  # 2. Frontend Web Service (Next.js 16 Brutalist Client)
+  # ========================================================
+  - type: web
+    name: campushub-web
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Route server-side proxy requests directly to backend private service
+      - key: BACKEND_INTERNAL_URL
+        fromService:
+          type: web
+          name: campushub-api
+          property: host
+
 # ========================================================
-# 2. Managed PostgreSQL Database (Free Tier)
+# 3. Managed PostgreSQL Database (Free Tier)
 # ========================================================
 databases:
   - name: campushub-db

@@ -1,5 +1,5 @@
 # ========================================================
-# BACKEND PRODUCTION DOCKERFILE (ROOT MIRROR)
+# BACKEND PRODUCTION DOCKERFILE
 # Multi-stage build with Debian Bookworm Slim
 # ========================================================
 FROM node:20-bookworm-slim AS deps

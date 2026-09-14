@@ -21,7 +21,7 @@ services:
       retries: 5
 
   # ========================================================
-  # 2. Redis 7 (In-Memory Cache & Background Job Queue)
+  # 2. Redis 7 (In-Memory Cache & Real-Time Pub/Sub)
   # ========================================================
   redis:
     image: redis:7-alpine
@@ -37,8 +37,51 @@ services:
       timeout: 5s
       retries: 5
 
+  # ========================================================
+  # 3. Express 5 Backend API
+  # ========================================================
+  api:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: campushub_api
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/campushub_dev?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_ACCESS_SECRET: dev_jwt_access_secret_for_local_docker_compose_testing_only
+      JWT_REFRESH_SECRET: dev_jwt_refresh_secret_for_local_docker_compose_testing_only
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ========================================================
+  # 4. Next.js 16 Brutalist Frontend
+  # ========================================================
+  web:
+    build:
+      context: .
+      dockerfile: ./frontend/Dockerfile
+    container_name: campushub_web
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      BACKEND_INTERNAL_URL: http://api:5000
+    depends_on:
+      - api
+
 # ========================================================
-# Named Volumes (Guarantees data persists across restarts)
+# Named Volumes
 # ========================================================
 volumes:
   postgres_data:
