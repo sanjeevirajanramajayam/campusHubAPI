@@ -11,9 +11,6 @@ services:
     region: oregon
     healthCheckPath: /health
 
-    # Automatically synchronize Prisma database schema before launching new container
-    preDeployCommand: npx prisma db push --schema=./backend/prisma/schema.prisma --accept-data-loss
-
     envVars:
       - key: NODE_ENV
         value: production
@@ -58,12 +55,9 @@ services:
         value: production
       - key: PORT
         value: 3000
-      # Route server-side proxy requests directly to backend private service
+      # Route server-side proxy requests to public backend URL
       - key: BACKEND_INTERNAL_URL
-        fromService:
-          type: web
-          name: campushub-api
-          property: host
+        value: https://campushub-api.onrender.com
 
 # ========================================================
 # 3. Managed PostgreSQL Database (Free Tier)

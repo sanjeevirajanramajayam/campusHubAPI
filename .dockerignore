@@ -1,10 +1,12 @@
 # Dependencies (Container builds its own native binaries)
-node_modules
-.pnpm-store
+**/node_modules
+**/.pnpm-store
 
 # Compiled Output
-dist
-build
+**/dist
+**/build
+**/out
+**/.next
 
 # Version Control & Metadata
 .git
@@ -12,8 +14,10 @@ build
 .github
 
 # Environment & Secrets (NEVER bake .env into Docker images!)
-.env
-.env.local
+**/.env
+**/.env.local
+**/.env.production
+**/.env.test
 *.pem
 
 # Logs & Debug
@@ -24,8 +28,8 @@ pnpm-debug.log*
 yarn-debug.log*
 
 # Test & Coverage
-coverage
-.nyc_output
+**/coverage
+**/.nyc_output
 scripts/*.test.js
 
 # IDE & OS files
