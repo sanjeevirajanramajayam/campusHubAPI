@@ -24,6 +24,19 @@ export function PostCard({
 }: PostCardProps) {
   const isAuthor = currentUser && (currentUser.id === post.authorId || currentUser.role === 'ADMIN');
 
+  // Safe numerical coercion to eliminate NaN
+  const rawLikes = post.likeCount ?? post._count?.likes;
+  const likeCount = typeof rawLikes === 'number' && !isNaN(rawLikes) ? rawLikes : 0;
+
+  const rawComments = post.commentCount ?? post._count?.comments;
+  const commentCount = typeof rawComments === 'number' && !isNaN(rawComments) ? rawComments : 0;
+
+  const isUpvoted = Boolean(post.hasLiked ?? post.isLikedByCaller ?? false);
+
+  const authorName = post.author
+    ? `${post.author.firstName} ${post.author.lastName || ''}`.trim()
+    : post.authorName || 'Student';
+
   const formatTime = (iso: string) => {
     const d = new Date(iso);
     const now = new Date();
@@ -41,14 +54,14 @@ export function PostCard({
       {/* 1. LEFT VOTE COLUMN */}
       <div className="vote-col">
         <button
-          className={`vote-btn ${post.hasLiked ? 'upvoted' : ''}`}
+          className={`vote-btn ${isUpvoted ? 'upvoted' : ''}`}
           title="Upvote dispatch"
           onClick={() => onVote(post.id)}
         >
           ▲
         </button>
-        <span className={`vote-count ${post.hasLiked ? 'upvoted' : ''}`}>
-          {post.likeCount}
+        <span className={`vote-count ${isUpvoted ? 'upvoted' : ''}`}>
+          {likeCount}
         </span>
       </div>
 
@@ -62,7 +75,7 @@ export function PostCard({
         </div>
 
         <div className="post-meta">
-          Submitted by <strong>u/{post.authorName}</strong>{' '}
+          Submitted by <strong>u/{authorName}</strong>{' '}
           {post.authorRole === 'ADMIN' && <span className="badge red">[ADMIN]</span>}{' '}
           {post.authorRole === 'CLUB_LEAD' && <span className="badge">[LEAD]</span>}{' '}
           <span className="pipe">|</span> {formatTime(post.createdAt)}
@@ -74,7 +87,7 @@ export function PostCard({
 
         <div className="post-actions">
           <button className="action-link" onClick={() => onToggleComments(post.id)}>
-            [ {post.commentCount || 0} COMMENTS {isExpanded ? '▲' : '▼'} ]
+            [ {commentCount} COMMENTS {isExpanded ? '▲' : '▼'} ]
           </button>
 
           {isAuthor && !post.isDeleted && (

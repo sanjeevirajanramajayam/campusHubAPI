@@ -1,10 +1,5 @@
 /**
  * CAMPUSHUB TYPED API CLIENT FOR NEXT.JS
- * 
- * NEXT.JS CONCEPT: Universal Execution (Client vs Server)
- * - Next.js runs code on both the server (Node.js during SSR) and client (Browser).
- * - On the server, `window` and `localStorage` do NOT exist.
- * - Always guard browser-only APIs using `typeof window !== 'undefined'`.
  */
 
 export interface ApiResponse<T = any> {
@@ -29,19 +24,30 @@ export interface User {
 export interface Post {
   id: string;
   authorId: string;
-  authorName: string;
-  authorRole: string;
+  author?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string | null;
+  };
+  authorName?: string;
+  authorRole?: string;
   clubId?: string | null;
   clubSlug?: string | null;
   title: string;
   content: string;
-  likeCount: number;
-  commentCount: number;
+  likeCount?: number;
+  commentCount?: number;
+  _count?: {
+    likes: number;
+    comments: number;
+  };
   tags: string[];
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
   hasLiked?: boolean;
+  isLikedByCaller?: boolean;
 }
 
 export interface CommentNode {
@@ -49,6 +55,11 @@ export interface CommentNode {
   postId: string;
   authorId: string;
   authorName: string;
+  author?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
   parentId: string | null;
   content: string;
   likeCount: number;
@@ -94,15 +105,12 @@ export interface Ticket {
 
 /**
  * Universal typed API request helper
- * Routes through Next.js proxy rewrite `/api/v1/*` -> `http://localhost:5000/api/v1/*`
  */
 export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<ApiResponse<T> | null> {
   const cleanPath = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-
-  // Next.js Safety: Check if running inside browser before accessing localStorage
   const isBrowser = typeof window !== 'undefined';
   const token = isBrowser ? localStorage.getItem('campushub_token') : null;
 
@@ -137,7 +145,6 @@ export async function apiRequest<T = any>(
 
     return data;
   } catch (err: any) {
-    // Next.js / Fetch: Don't throw if request was intentionally aborted by user debouncing
     if (err.name === 'AbortError') {
       return null;
     }

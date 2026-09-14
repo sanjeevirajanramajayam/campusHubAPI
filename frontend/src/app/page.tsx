@@ -59,11 +59,30 @@ export default function CampusHubApp() {
     if (!data) return;
 
     if (type === 'POST_VOTED') {
+      const incomingLikes = Number(data.likeCount ?? data.totalLikes ?? 0);
+      const safeLikes = !isNaN(incomingLikes) ? incomingLikes : 0;
       setPosts((prev) =>
-        prev.map((p) => (p.id === data.postId ? { ...p, likeCount: data.likeCount } : p)),
+        prev.map((p) =>
+          p.id === data.postId
+            ? {
+                ...p,
+                likeCount: safeLikes,
+                _count: {
+                  likes: safeLikes,
+                  comments: p.commentCount ?? p._count?.comments ?? 0,
+                },
+              }
+            : p,
+        ),
       );
     } else if (type === 'POST_CREATED') {
-      setPosts((prev) => (prev.some((p) => p.id === data.post.id) ? prev : [data.post, ...prev]));
+      const newPost = {
+        ...data.post,
+        likeCount: Number(data.post.likeCount ?? data.post._count?.likes ?? 0),
+        commentCount: Number(data.post.commentCount ?? data.post._count?.comments ?? 0),
+        hasLiked: false,
+      };
+      setPosts((prev) => (prev.some((p) => p.id === newPost.id) ? prev : [newPost, ...prev]));
     } else if (type === 'POST_DELETED') {
       setPosts((prev) =>
         prev.map((p) =>
@@ -121,9 +140,14 @@ export default function CampusHubApp() {
 
       const res = await apiRequest<{ posts: Post[] }>(`/posts?${params.toString()}`, { signal });
       if (res?.data?.posts) {
-        let list = res.data.posts;
+        let list = res.data.posts.map((p) => ({
+          ...p,
+          likeCount: Number(p.likeCount ?? p._count?.likes ?? 0),
+          commentCount: Number(p.commentCount ?? p._count?.comments ?? 0),
+          hasLiked: Boolean(p.hasLiked ?? p.isLikedByCaller ?? false),
+        }));
         if (currentSort === 'top') {
-          list = [...list].sort((a, b) => b.likeCount - a.likeCount);
+          list = [...list].sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
         }
         setPosts(list);
       }
@@ -146,23 +170,55 @@ export default function CampusHubApp() {
   // Handle Post Vote
   const handleVote = async (postId: string) => {
     if (!currentUser) {
-      alert('Authentication required to upvote.');
+      alert('Authentication required: please log in on the right panel to vote.');
       return;
     }
+
+    // 1. Optimistic toggle
     setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              hasLiked: !p.hasLiked,
-              likeCount: p.hasLiked ? p.likeCount - 1 : p.likeCount + 1,
-            }
-          : p,
-      ),
+      prev.map((p) => {
+        if (p.id !== postId) return p;
+        const currentLikes = Number(p.likeCount ?? p._count?.likes ?? 0);
+        const currentLiked = Boolean(p.hasLiked ?? p.isLikedByCaller ?? false);
+        const nextLiked = !currentLiked;
+        const nextLikes = nextLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+        return {
+          ...p,
+          hasLiked: nextLiked,
+          isLikedByCaller: nextLiked,
+          likeCount: nextLikes,
+          _count: {
+            likes: nextLikes,
+            comments: p.commentCount ?? p._count?.comments ?? 0,
+          },
+        };
+      }),
     );
 
     try {
-      await apiRequest(`/posts/${postId}/like`, { method: 'POST' });
+      const res = await apiRequest<{ liked: boolean; totalLikes: number }>(`/posts/${postId}/like`, {
+        method: 'POST',
+      });
+      if (res?.data) {
+        const { liked, totalLikes } = res.data;
+        const confirmedCount = typeof totalLikes === 'number' && !isNaN(totalLikes) ? totalLikes : 0;
+        setPosts((prev) =>
+          prev.map((p) =>
+            p.id === postId
+              ? {
+                  ...p,
+                  hasLiked: liked,
+                  isLikedByCaller: liked,
+                  likeCount: confirmedCount,
+                  _count: {
+                    likes: confirmedCount,
+                    comments: p.commentCount ?? p._count?.comments ?? 0,
+                  },
+                }
+              : p,
+          ),
+        );
+      }
     } catch (err: any) {
       alert(`Vote failed: ${err.message}`);
       loadPosts();
