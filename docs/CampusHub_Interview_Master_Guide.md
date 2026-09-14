@@ -15,6 +15,7 @@
 7. [Process Lifecycle, Signals & Graceful Shutdown](#7-process-lifecycle-signals--graceful-shutdown)
 8. [Database Fundamentals, ORMs & Prisma](#8-database-fundamentals-orms--prisma)
 9. [Community Feed, Threaded Comments & Real-Time SSE Architecture](#9-community-feed-threaded-comments--real-time-sse-architecture)
+10. [Repository & System Architecture: Monorepo, Polyrepo & Microservices](#10-repository--system-architecture-monorepo-polyrepo--microservices)
 
 ---
 
@@ -1516,5 +1517,103 @@
   * Data Invariant: `event.registeredCount === 5`, `tickets.length === 5`.
   * Overselling: **0% (Airtight ACID compliance)**.
 
+---
 
+## 10. Repository & System Architecture: Monorepo, Polyrepo & Microservices
 
+### Q84: What is the fundamental difference between a Monorepo and a Monolith?
+* **Core Distinction**:
+  * **Monorepo is a Code Management / Version Control Pattern**: It describes *where source code lives*. A single Git repository contains multiple apps, packages, or services with independent release cycles. A monorepo can deploy 10 microservices, 2 web apps, and 3 shared libraries.
+  * **Monolith is a Runtime / Deployment Architecture Pattern**: It describes *how code executes in production*. All business capabilities run inside a single process or binary deployed to a server.
+* **The Four Quadrants**:
+  1. **Monolith in a Monorepo**: Single codebase, single deployment binary (Classic Rails / Django / single Express app).
+  2. **Microservices in a Monorepo** *(Google, Meta, Uber)*: Hundreds of services and libraries in one Git repo, deployed independently as Docker containers.
+  3. **Microservices in Polyrepos** *(Classic Netflix)*: Each microservice has its own dedicated Git repository, CI/CD pipeline, and version tags.
+  4. **Distributed Monolith (Anti-Pattern)**: Polyrepo setup where services share tight runtime coupling, requiring synchronized multi-repo deployments.
+
+---
+
+### Q85: Architectural Comparison Matrix: Monorepo vs Polyrepo vs Modular Monolith vs Microservices
+
+| Dimension | Monorepo (Turborepo / pnpm) | Polyrepo (Multi-Repo) | Modular Monolith | Distributed Microservices |
+| :--- | :--- | :--- | :--- | :--- |
+| **Git Repositories** | Exactly 1 | $N$ (One per service) | Exactly 1 | $N$ (or 1 in monorepo) |
+| **Deployment Units** | Multiple independent artifacts | Multiple independent artifacts | Exactly 1 binary | Dozens of containers |
+| **Network Boundary** | In-process for shared libs, HTTP/gRPC for apps | Network across all services | In-process function calls | Network hops (HTTP/gRPC/Kafka) |
+| **Data Consistency** | Flexible (Per-service DBs or shared DB) | Eventual Consistency (Sagas) | ACID Transactions (Single DB) | Eventual Consistency |
+| **Refactoring & Atomic Changes** | **Trivial** (Update API DTO + UI in 1 commit) | **Painful** (Multi-repo PRs, version drift) | **Trivial** (Single refactor) | **Hard** (Backward compatibility layers) |
+| **Tooling Complexity** | Medium (Turborepo / Nx / pnpm) | Low per repo, High for orchestration | Lowest | Highest (Kubernetes, Service Mesh, Istio) |
+| **Blast Radius** | Low (with proper CI/CD boundaries) | Isolated per repo | High (1 bug crashes entire process) | Low (Fault isolation per service) |
+
+---
+
+### Q86: What are the engineering trade-offs of choosing a Monorepo?
+
+#### The Advantages:
+1. **Atomic Commits Across Stacks**:
+   * If the backend changes a user payload from `{ name }` to `{ firstName, lastName }`, the backend schema, API DTO, and Next.js frontend consumer are updated in **one single Git commit and Pull Request**.
+   * Eliminates **version drift** between client apps and backend APIs.
+2. **Shared Code Without Package Registry Overhead**:
+   * Shared TypeScript interfaces, validation schemas (Zod), and utility functions live in `packages/shared`.
+   * Developers do **not** need to run `npm publish`, wait for npm registry propagation, and `npm install` in consumer apps. The workspace symlinks code locally in real-time.
+3. **Single Dependency Source of Truth**:
+   * Prevents "dependency hell" where Service A uses `zod@3.20` and Service B uses `zod@3.22` with incompatible type definitions.
+4. **Unified CI/CD Tooling**:
+   * Single linting rule set (ESLint, Prettier, TypeScript config) enforced universally across all apps.
+
+#### The Challenges & Mitigations:
+1. **Git Repository Bloat & Scale**:
+   * *Problem*: As commits, assets, and history grow, `git clone` and `git status` slow down.
+   * *Mitigation*: Sparse checkout, shallow clones (`--depth 1`), and Git LFS for binary files.
+2. **CI Pipeline Duration**:
+   * *Problem*: Running every test for every PR causes 45-minute CI queues.
+   * *Mitigation*: **Directed Acyclic Graph (DAG) build caching** (Turborepo / Nx). If a PR only changes `frontend/`, the CI cache replays backend tests in 0 seconds.
+3. **Access Control & Permissions**:
+   * *Problem*: By default, every developer can view and edit all directories.
+   * *Mitigation*: GitHub `CODEOWNERS` file requiring designated team approvals for specific subtrees (e.g. `/src/infrastructure` vs `/frontend`).
+
+---
+
+### Q87: How do Modern Monorepo Build Engines (Turborepo, Nx) Achieve Sub-Second Builds?
+
+#### 1. Content-Aware Computation Hashing:
+* Instead of timestamps, the build engine calculates a cryptographic SHA-256 hash of:
+  * The source files in the package.
+  * The package's internal and external dependencies.
+  * Environment variable values specified in `turbo.json`.
+* If inputs have not changed, the build engine **never executes the task again**.
+
+#### 2. Directed Acyclic Graph (DAG) Execution:
+* The build engine parses the dependency graph (`pnpm-workspace.yaml` / `package.json` dependencies).
+* It executes non-dependent tasks in parallel across all available CPU cores:
+  ```
+          ┌─────────────┐
+          │  shared-dto │
+          └──────┬──────┘
+                 │ (compile first)
+          ┌──────┴──────┐
+          ▼             ▼
+     ┌─────────┐   ┌─────────┐
+     │ express │   │ next.js │ (compiled in parallel)
+     └─────────┘   └─────────┘
+  ```
+
+#### 3. Remote Caching:
+* In CI/CD, build artifacts (`.next/`, `dist/`) and test outputs are uploaded to a remote cache (Vercel Remote Cache or AWS S3).
+* When a developer pulls the branch locally, their build reuses the CI computation hash and finishes in milliseconds (**Cache Hit [Remote]**).
+
+---
+
+### Q88: How Does CampusHub Implement the Decoupled Monorepo Architecture?
+
+CampusHub uses a **Decoupled Two-Tier Monorepo Workspace**:
+1. **Backend Engine (`src/`, port 5000)**:
+   - High-throughput Express 5 REST API + SSE Event Hub.
+   - Modular Monolith structure (`modules/auth`, `modules/posts`, `modules/clubs`, `modules/events`).
+   - Direct ownership of PostgreSQL and Redis connections.
+2. **Frontend Presentation (`frontend/`, port 3000)**:
+   - Next.js 16 App Router application.
+   - Self-hosted industrial brutalist design system.
+   - Acts as a reverse-proxy consumer via Next.js rewrites (`/api/v1/:path*` -> `http://localhost:5000/api/v1/:path*`).
+3. **Documentation Hub (`docs/`)**:
+   - Centralized repository of architectural decision records (ADRs), user stories, migration blueprints, and interview mastery materials.

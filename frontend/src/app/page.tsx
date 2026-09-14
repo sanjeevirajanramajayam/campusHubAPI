@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Post, Club, EventItem, Ticket, User, apiRequest, formatUserCallsign } from '@/lib/api';
+import { Post, Club, EventItem, Ticket, User, apiRequest } from '@/lib/api';
 import { useRealtimeFeed, RealtimeFeedPayload } from '@/hooks/useRealtimeFeed';
 import { TickerBar } from '@/components/TickerBar';
 import { SubredditNav } from '@/components/SubredditNav';
@@ -11,6 +11,9 @@ import { CommentDrawer } from '@/components/CommentDrawer';
 import { ClubsDirectory } from '@/components/ClubsDirectory';
 import { EventsSchedule } from '@/components/EventsSchedule';
 import { ProfileModal } from '@/components/ProfileModal';
+import { AuthSidebar } from '@/components/AuthSidebar';
+import { CreatePostModal } from '@/components/CreatePostModal';
+import { EditPostModal } from '@/components/EditPostModal';
 
 export default function CampusHubApp() {
   // Navigation & View State
@@ -31,27 +34,10 @@ export default function CampusHubApp() {
   const [userMemberships, setUserMemberships] = useState<Set<string>>(new Set());
   const [userTickets, setUserTickets] = useState<Ticket[]>([]);
 
-  // Auth Form State (Logged Out)
-  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [regFirstName, setRegFirstName] = useState('');
-  const [regLastName, setRegLastName] = useState('');
-  const [authError, setAuthError] = useState<string | null>(null);
-
   // Modals
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
-
-  // Create Post Form
-  const [newPostTitle, setNewPostTitle] = useState('');
-  const [newPostContent, setNewPostContent] = useState('');
-  const [newPostClub, setNewPostClub] = useState('');
-
-  // Edit Post Form
-  const [editTitle, setEditTitle] = useState('');
-  const [editContent, setEditContent] = useState('');
 
   // Real-Time SSE Listener
   const handleRealtimeEvent = useCallback((payload: RealtimeFeedPayload) => {
@@ -76,10 +62,13 @@ export default function CampusHubApp() {
         ),
       );
     } else if (type === 'POST_CREATED') {
-      const newPost = {
-        ...data.post,
-        likeCount: Number(data.post.likeCount ?? data.post._count?.likes ?? 0),
-        commentCount: Number(data.post.commentCount ?? data.post._count?.comments ?? 0),
+      const incomingPost = data.post || data;
+      const safeLikes = Number(incomingPost.likeCount ?? incomingPost._count?.likes ?? 0);
+      const safeComments = Number(incomingPost.commentCount ?? incomingPost._count?.comments ?? 0);
+      const newPost: Post = {
+        ...incomingPost,
+        likeCount: !isNaN(safeLikes) ? safeLikes : 0,
+        commentCount: !isNaN(safeComments) ? safeComments : 0,
         hasLiked: false,
       };
       setPosts((prev) => (prev.some((p) => p.id === newPost.id) ? prev : [newPost, ...prev]));
@@ -170,12 +159,16 @@ export default function CampusHubApp() {
 
       const res = await apiRequest<{ posts: Post[] }>(`/posts?${params.toString()}`, { signal });
       if (res?.data?.posts) {
-        let list = res.data.posts.map((p) => ({
-          ...p,
-          likeCount: Number(p.likeCount ?? p._count?.likes ?? 0),
-          commentCount: Number(p.commentCount ?? p._count?.comments ?? 0),
-          hasLiked: Boolean(p.hasLiked ?? p.isLikedByCaller ?? false),
-        }));
+        let list = res.data.posts.map((p) => {
+          const safeLikes = Number(p.likeCount ?? p._count?.likes ?? 0);
+          const safeComments = Number(p.commentCount ?? p._count?.comments ?? 0);
+          return {
+            ...p,
+            likeCount: !isNaN(safeLikes) ? safeLikes : 0,
+            commentCount: !isNaN(safeComments) ? safeComments : 0,
+            hasLiked: Boolean(p.hasLiked ?? p.isLikedByCaller ?? false),
+          };
+        });
         if (currentSort === 'top') {
           list = [...list].sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
         }
@@ -250,8 +243,8 @@ export default function CampusHubApp() {
         );
       }
     } catch (err: any) {
+      loadPosts(); // Revert on failure
       alert(`Vote failed: ${err.message}`);
-      loadPosts();
     }
   };
 
@@ -272,102 +265,19 @@ export default function CampusHubApp() {
     }
   };
 
-  // Handle Post Edit Submit
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingPost) return;
-    try {
-      await apiRequest(`/posts/${editingPost.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ title: editTitle, content: editContent }),
-      });
-      setEditingPost(null);
-      loadPosts();
-    } catch (err: any) {
-      alert(`Edit failed: ${err.message}`);
-    }
-  };
-
-  // Handle Create Post
-  const handleCreatePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPostTitle || !newPostContent || !newPostClub) {
-      alert('Please fill out all fields.');
-      return;
-    }
-    try {
-      await apiRequest('/posts', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: newPostTitle.trim(),
-          content: newPostContent.trim(),
-          tags: [newPostClub],
-        }),
-      });
-      setShowCreatePostModal(false);
-      setNewPostTitle('');
-      setNewPostContent('');
-      setNewPostClub('');
-      loadPosts();
-    } catch (err: any) {
-      alert(`Broadcast failed: ${err.message}`);
-    }
-  };
-
-  // Handle Login
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    try {
-      const res = await apiRequest<{ accessToken: string; user: User }>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email: authEmail.trim(), password: authPassword }),
-      });
-      if (res?.data) {
-        localStorage.setItem('campushub_token', res.data.accessToken);
-        localStorage.setItem('campushub_user', JSON.stringify(res.data.user));
-        setCurrentUser(res.data.user);
-        setAuthEmail('');
-        setAuthPassword('');
-        loadPosts();
-      }
-    } catch (err: any) {
-      setAuthError(err.message);
-    }
-  };
-
-  // Handle Register
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    try {
-      const res = await apiRequest<{ accessToken: string; user: User }>('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({
-          firstName: regFirstName.trim(),
-          lastName: regLastName.trim(),
-          email: authEmail.trim(),
-          password: authPassword,
-        }),
-      });
-      if (res?.data) {
-        localStorage.setItem('campushub_token', res.data.accessToken);
-        localStorage.setItem('campushub_user', JSON.stringify(res.data.user));
-        setCurrentUser(res.data.user);
-        loadPosts();
-      }
-    } catch (err: any) {
-      setAuthError(err.message);
-    }
-  };
-
   // Handle Logout
-  const handleLogout = () => {
-    localStorage.removeItem('campushub_token');
-    localStorage.removeItem('campushub_user');
-    setCurrentUser(null);
-    setUserMemberships(new Set());
-    loadPosts();
+  const handleLogout = async () => {
+    try {
+      await apiRequest('/auth/logout', { method: 'POST' });
+    } catch {
+      // Best-effort logout
+    } finally {
+      localStorage.removeItem('campushub_token');
+      localStorage.removeItem('campushub_user');
+      setCurrentUser(null);
+      setUserTickets([]);
+      loadPosts();
+    }
   };
 
   return (
@@ -379,7 +289,7 @@ export default function CampusHubApp() {
       <SubredditNav
         clubs={clubs}
         currentClubId={currentClubId}
-        onSelectClub={(slug) => {
+        onSelectClub={(slug: string) => {
           setCurrentClubId(slug);
           setCurrentView('feed');
         }}
@@ -437,7 +347,7 @@ export default function CampusHubApp() {
                 </button>
               </div>
 
-              <SearchBar onSearch={(q, signal) => setSearchQuery(q)} />
+              <SearchBar onSearch={(q: string) => setSearchQuery(q)} />
             </div>
 
             {/* Active Filter Banner */}
@@ -452,10 +362,9 @@ export default function CampusHubApp() {
               </div>
             )}
 
-            {/* Posts Stream */}
-            <div className="posts-stream">
+            <div className="posts-container">
               {loadingPosts ? (
-                <div className="loading-box">[ QUERYING FEED TELEMETRY... ]</div>
+                <div className="loading-box">[ SCANNING DATA LINK // FETCHING BROADCASTS... ]</div>
               ) : posts.length === 0 ? (
                 <div className="empty-box">[ NO DISPATCHES FOUND FOR CURRENT CHANNEL ]</div>
               ) : (
@@ -469,11 +378,7 @@ export default function CampusHubApp() {
                       onToggleComments={(id) =>
                         setExpandedPostId(expandedPostId === id ? null : id)
                       }
-                      onEdit={(p) => {
-                        setEditingPost(p);
-                        setEditTitle(p.title);
-                        setEditContent(p.content);
-                      }}
+                      onEdit={(p) => setEditingPost(p)}
                       onDelete={handleDeletePost}
                     />
                     {expandedPostId === post.id && (
@@ -505,7 +410,7 @@ export default function CampusHubApp() {
           </section>
         )}
 
-        {/* VIEW 2: CLUBS */}
+        {/* VIEW 2: CLUBS DIRECTORY */}
         {currentView === 'clubs' && (
           <ClubsDirectory
             clubs={clubs}
@@ -519,7 +424,7 @@ export default function CampusHubApp() {
           />
         )}
 
-        {/* VIEW 3: EVENTS */}
+        {/* VIEW 3: EVENTS SCHEDULE */}
         {currentView === 'events' && (
           <EventsSchedule
             events={events}
@@ -534,318 +439,42 @@ export default function CampusHubApp() {
           />
         )}
 
-        {/* SIDEBAR */}
-        <aside className="sidebar-section">
-          {/* AUTH CARD */}
-          <div className="brutal-card auth-card">
-            <div className="card-header">[ OPERATOR AUTHENTICATION ]</div>
-            <div className="card-body">
-              {currentUser ? (
-                <div className="user-session-view">
-                  <div className="user-badge">&gt;&gt; u/{formatUserCallsign(currentUser)}</div>
-                  <div className="role-badge">ROLE: {currentUser.role}</div>
-                  <div
-                    style={{
-                      fontSize: '10px',
-                      color: 'var(--text-muted)',
-                      wordBreak: 'break-all',
-                      marginTop: '4px',
-                    }}
-                  >
-                    EMAIL: {currentUser.email}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '10px',
-                      color: 'var(--accent-green)',
-                      fontWeight: 700,
-                      marginTop: '4px',
-                    }}
-                  >
-                    [ JWT SESSION ACTIVE ]
-                  </div>
-                  <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
-                    <button
-                      className="brutal-btn mini"
-                      style={{ flex: 1 }}
-                      onClick={() => setShowProfileModal(true)}
-                    >
-                      [ EDIT PROFILE ]
-                    </button>
-                    <button
-                      className="brutal-btn mini red-btn"
-                      style={{ flex: 1 }}
-                      onClick={handleLogout}
-                    >
-                      [ LOGOUT ]
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="auth-container">
-                  <div className="auth-tabs">
-                    <button
-                      className={`tab-btn ${authTab === 'login' ? 'active' : ''}`}
-                      onClick={() => setAuthTab('login')}
-                    >
-                      LOGIN
-                    </button>
-                    <button
-                      className={`tab-btn ${authTab === 'register' ? 'active' : ''}`}
-                      onClick={() => setAuthTab('register')}
-                    >
-                      REGISTER
-                    </button>
-                  </div>
-
-                  {authError && <div className="auth-status error">[ {authError} ]</div>}
-
-                  {authTab === 'login' ? (
-                    <form onSubmit={handleLogin} className="auth-form">
-                      <label className="form-label">CAMPUS EMAIL</label>
-                      <input
-                        type="email"
-                        className="brutal-input"
-                        placeholder="user@campus.edu"
-                        value={authEmail}
-                        onChange={(e) => setAuthEmail(e.target.value)}
-                        required
-                      />
-                      <label className="form-label">PASSWORD</label>
-                      <input
-                        type="password"
-                        className="brutal-input"
-                        placeholder="••••••••"
-                        value={authPassword}
-                        onChange={(e) => setAuthPassword(e.target.value)}
-                        required
-                      />
-                      <button type="submit" className="brutal-btn full red-btn" style={{ marginTop: '6px' }}>
-                        [ AUTHENTICATE ]
-                      </button>
-                    </form>
-                  ) : (
-                    <form onSubmit={handleRegister} className="auth-form">
-                      <label className="form-label">FIRST NAME</label>
-                      <input
-                        type="text"
-                        className="brutal-input"
-                        placeholder="Alex"
-                        value={regFirstName}
-                        onChange={(e) => setRegFirstName(e.target.value)}
-                        required
-                      />
-                      <label className="form-label">LAST NAME</label>
-                      <input
-                        type="text"
-                        className="brutal-input"
-                        placeholder="Chen"
-                        value={regLastName}
-                        onChange={(e) => setRegLastName(e.target.value)}
-                        required
-                      />
-                      <label className="form-label">CAMPUS EMAIL</label>
-                      <input
-                        type="email"
-                        className="brutal-input"
-                        placeholder="alex@campus.edu"
-                        value={authEmail}
-                        onChange={(e) => setAuthEmail(e.target.value)}
-                        required
-                      />
-                      <label className="form-label">PASSWORD</label>
-                      <input
-                        type="password"
-                        className="brutal-input"
-                        placeholder="Min 8 chars"
-                        value={authPassword}
-                        onChange={(e) => setAuthPassword(e.target.value)}
-                        required
-                        minLength={8}
-                      />
-                      <button type="submit" className="brutal-btn full" style={{ marginTop: '6px' }}>
-                        [ CREATE ACCOUNT ]
-                      </button>
-                    </form>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ACTION BUTTON */}
-          <button
-            className="brutal-btn full red-btn"
-            style={{ padding: '10px 14px', fontSize: '12px' }}
-            onClick={() => {
-              if (!currentUser) alert('Authentication required to broadcast dispatches.');
-              else setShowCreatePostModal(true);
-            }}
-          >
-            + DISPATCH BROADCAST
-          </button>
-
-          {/* TICKET WALLET (SIDEBAR PREVIEW) */}
-          <div className="brutal-card wallet-card">
-            <div className="card-header highlight">[ TICKET WALLET ({userTickets.length}) ]</div>
-            <div className="card-body">
-              {userTickets.length === 0 ? (
-                <div className="empty-wallet">[ NO TICKETS ISSUED YET ]</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {userTickets.slice(0, 2).map((t, idx) => (
-                    <div key={t.id || idx} className="ticket-pass" style={{ margin: 0, padding: '8px' }}>
-                      <div className="ticket-pass-title" style={{ fontSize: '11px' }}>{t.eventTitle || 'Campus Keynote'}</div>
-                      <div className="ticket-pass-code" style={{ fontSize: '14px' }}>{t.ticketCode}</div>
-                    </div>
-                  ))}
-                  {userTickets.length > 2 && (
-                    <button className="action-link" onClick={() => setCurrentView('events')}>
-                      [ VIEW ALL {userTickets.length} PASSES &gt;&gt; ]
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* SYSTEM TELEMETRY */}
-          <div className="brutal-card rules-card">
-            <div className="card-header">[ TELEMETRY &amp; ARCHITECTURE ]</div>
-            <div className="card-body rules-body">
-              <div className="rule-row">
-                <span className="rule-code">TECH-01</span>
-                <span className="rule-desc">Next.js 16 App Router + Turbopack</span>
-              </div>
-              <div className="rule-row">
-                <span className="rule-code">TECH-02</span>
-                <span className="rule-desc">Express 5 + Prisma + PostgreSQL</span>
-              </div>
-              <div className="rule-row">
-                <span className="rule-code">TECH-03</span>
-                <span className="rule-desc">Redis ZSet Sliding-Window Rate Limit</span>
-              </div>
-              <div className="rule-row">
-                <span className="rule-code">TECH-04</span>
-                <span className="rule-desc">PostgreSQL Row Locks (SELECT FOR UPDATE)</span>
-              </div>
-              <div className="rule-row">
-                <span className="rule-code">TECH-05</span>
-                <span className="rule-desc">Real-Time EventSource SSE Pub/Sub</span>
-              </div>
-            </div>
-          </div>
-        </aside>
+        {/* 4. SIDEBAR */}
+        <AuthSidebar
+          currentUser={currentUser}
+          userTickets={userTickets}
+          onOpenProfile={() => setShowProfileModal(true)}
+          onLogout={handleLogout}
+          onLoginSuccess={(user, token) => {
+            localStorage.setItem('campushub_token', token);
+            localStorage.setItem('campushub_user', JSON.stringify(user));
+            setCurrentUser(user);
+            loadPosts();
+          }}
+          onOpenCreatePost={() => {
+            if (!currentUser) alert('Authentication required to broadcast dispatches.');
+            else setShowCreatePostModal(true);
+          }}
+          onViewEvents={() => setCurrentView('events')}
+        />
       </main>
 
       {/* CREATE POST MODAL */}
       {showCreatePostModal && (
-        <div className="modal-overlay">
-          <div className="modal-box brutal-modal">
-            <div className="modal-header">
-              <span>[ SUBMIT DISPATCH TO FEED ]</span>
-              <button className="close-btn" onClick={() => setShowCreatePostModal(false)}>
-                &times;
-              </button>
-            </div>
-            <form onSubmit={handleCreatePost} className="modal-body">
-              <label className="form-label">ASSIGN TO CLUB / CHANNEL</label>
-              <select
-                className="brutal-select"
-                value={newPostClub}
-                onChange={(e) => setNewPostClub(e.target.value)}
-                required
-              >
-                <option value="">-- SELECT TARGET CLUB --</option>
-                {clubs.map((c) => (
-                  <option key={c.id} value={c.slug}>
-                    c/{c.slug} ({c.name})
-                  </option>
-                ))}
-              </select>
-
-              <label className="form-label">DISPATCH HEADLINE (TITLE)</label>
-              <input
-                type="text"
-                className="brutal-input"
-                placeholder="Clear, concise headline..."
-                value={newPostTitle}
-                onChange={(e) => setNewPostTitle(e.target.value)}
-                required
-                maxLength={150}
-              />
-
-              <label className="form-label">DISPATCH CONTENT</label>
-              <textarea
-                className="brutal-textarea"
-                rows={4}
-                placeholder="Full dispatch details..."
-                value={newPostContent}
-                onChange={(e) => setNewPostContent(e.target.value)}
-                required
-              />
-
-              <div className="modal-footer">
-                <button type="submit" className="brutal-btn red-btn">
-                  [ TRANSMIT DISPATCH ]
-                </button>
-                <button
-                  type="button"
-                  className="brutal-btn"
-                  onClick={() => setShowCreatePostModal(false)}
-                >
-                  [ CANCEL ]
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <CreatePostModal
+          clubs={clubs}
+          onClose={() => setShowCreatePostModal(false)}
+          onPostCreated={loadPosts}
+        />
       )}
 
       {/* EDIT POST MODAL */}
       {editingPost && (
-        <div className="modal-overlay">
-          <div className="modal-box brutal-modal">
-            <div className="modal-header">
-              <span>[ EDIT BROADCAST DISPATCH ]</span>
-              <button className="close-btn" onClick={() => setEditingPost(null)}>
-                &times;
-              </button>
-            </div>
-            <form onSubmit={handleSaveEdit} className="modal-body">
-              <label className="form-label">HEADLINE</label>
-              <input
-                type="text"
-                className="brutal-input"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                required
-              />
-
-              <label className="form-label">CONTENT</label>
-              <textarea
-                className="brutal-textarea"
-                rows={4}
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                required
-              />
-
-              <div className="modal-footer">
-                <button type="submit" className="brutal-btn red-btn">
-                  [ SAVE CHANGES ]
-                </button>
-                <button
-                  type="button"
-                  className="brutal-btn"
-                  onClick={() => setEditingPost(null)}
-                >
-                  [ CANCEL ]
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <EditPostModal
+          post={editingPost}
+          onClose={() => setEditingPost(null)}
+          onPostUpdated={loadPosts}
+        />
       )}
 
       {/* PROFILE MODAL */}
