@@ -15,10 +15,21 @@ export interface ApiResponse<T = any> {
 export interface User {
   id: string;
   email: string;
-  name: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
   role: 'STUDENT' | 'ADMIN' | 'CLUB_LEAD';
   avatarUrl?: string | null;
   createdAt: string;
+}
+
+export function formatUserCallsign(user: User | null | undefined): string {
+  if (!user) return 'ANONYMOUS';
+  if (user.name && user.name.trim()) return user.name.trim();
+  const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+  if (fullName) return fullName;
+  if (user.email) return user.email.split('@')[0];
+  return 'OPERATOR';
 }
 
 export interface Post {

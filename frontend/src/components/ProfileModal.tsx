@@ -10,10 +10,9 @@ interface ProfileModalProps {
 }
 
 export function ProfileModal({ user, onClose, onUserUpdated }: ProfileModalProps) {
-  const [name, setName] = useState(user.name || '');
+  const [firstName, setFirstName] = useState(user.firstName || user.name?.split(' ')[0] || '');
+  const [lastName, setLastName] = useState(user.lastName || user.name?.split(' ').slice(1).join(' ') || '');
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || '');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,12 +20,9 @@ export function ProfileModal({ user, onClose, onUserUpdated }: ProfileModalProps
     setLoading(true);
 
     const payload: any = {};
-    if (name.trim()) payload.name = name.trim();
+    if (firstName.trim()) payload.firstName = firstName.trim();
+    if (lastName.trim()) payload.lastName = lastName.trim();
     if (avatarUrl.trim()) payload.avatarUrl = avatarUrl.trim();
-    if (currentPassword && newPassword) {
-      payload.currentPassword = currentPassword;
-      payload.newPassword = newPassword;
-    }
 
     try {
       const res = await apiRequest<{ user: User }>('/auth/me', {
@@ -35,7 +31,12 @@ export function ProfileModal({ user, onClose, onUserUpdated }: ProfileModalProps
       });
 
       if (res?.data?.user) {
-        onUserUpdated(res.data.user);
+        const updated = {
+          ...res.data.user,
+          name: `${res.data.user.firstName || ''} ${res.data.user.lastName || ''}`.trim(),
+        };
+        localStorage.setItem('campushub_user', JSON.stringify(updated));
+        onUserUpdated(updated);
         onClose();
         alert('Profile telemetry updated successfully!');
       }
@@ -56,12 +57,21 @@ export function ProfileModal({ user, onClose, onUserUpdated }: ProfileModalProps
           </button>
         </div>
         <form onSubmit={handleSubmit} className="modal-body">
-          <label className="form-label">OPERATOR CALLSIGN (NAME)</label>
+          <label className="form-label">FIRST NAME</label>
           <input
             type="text"
             className="brutal-input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+          />
+
+          <label className="form-label">LAST NAME</label>
+          <input
+            type="text"
+            className="brutal-input"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
             required
           />
 
@@ -74,32 +84,7 @@ export function ProfileModal({ user, onClose, onUserUpdated }: ProfileModalProps
             onChange={(e) => setAvatarUrl(e.target.value)}
           />
 
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '6px' }}>
-            <span className="telemetry-label" style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-              [ RE-AUTHENTICATE FOR PASSWORD CHANGE ]
-            </span>
-          </div>
-
-          <label className="form-label">CURRENT PASSWORD</label>
-          <input
-            type="password"
-            className="brutal-input"
-            placeholder="Enter current password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-          />
-
-          <label className="form-label">NEW PASSWORD</label>
-          <input
-            type="password"
-            className="brutal-input"
-            placeholder="Minimum 8 characters"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            minLength={8}
-          />
-
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
             <button type="submit" className="brutal-btn full red-btn" disabled={loading}>
               {loading ? '[ SAVING... ]' : '[ SAVE SETTINGS ]'}
             </button>

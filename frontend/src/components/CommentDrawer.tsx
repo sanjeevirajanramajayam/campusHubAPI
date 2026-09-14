@@ -9,6 +9,18 @@ interface CommentDrawerProps {
   onCommentCountChange: (postId: string, newCount: number) => void;
 }
 
+// Recursively count all nodes including nested replies
+function countTotalComments(nodes: CommentNode[]): number {
+  let count = 0;
+  for (const node of nodes) {
+    count += 1;
+    if (node.replies && node.replies.length > 0) {
+      count += countTotalComments(node.replies);
+    }
+  }
+  return count;
+}
+
 export function CommentDrawer({ postId, currentUser, onCommentCountChange }: CommentDrawerProps) {
   const [comments, setComments] = useState<CommentNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +34,8 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
       const res = await apiRequest<{ comments: CommentNode[] }>(`/posts/${postId}/comments`);
       if (res?.data?.comments) {
         setComments(res.data.comments);
+        const total = countTotalComments(res.data.comments);
+        onCommentCountChange(postId, total);
       }
     } catch (err: any) {
       console.warn('Failed to load comments:', err.message);
@@ -34,6 +48,8 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
     fetchComments();
   }, [postId]);
 
+  const totalCount = countTotalComments(comments);
+
   const handleCreateComment = async (parentId: string | null = null, content: string) => {
     if (!currentUser) {
       alert('Authentication required to submit comments.');
@@ -42,6 +58,9 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
     if (!content.trim()) return;
 
     try {
+      // Optimistic count increment
+      onCommentCountChange(postId, totalCount + 1);
+
       await apiRequest(`/posts/${postId}/comments`, {
         method: 'POST',
         body: JSON.stringify({ content: content.trim(), parentId }),
@@ -53,8 +72,9 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
         setNewCommentText('');
       }
       await fetchComments();
-      onCommentCountChange(postId, comments.length + 1);
     } catch (err: any) {
+      // Rollback on failure
+      onCommentCountChange(postId, totalCount);
       alert(`Comment failed: ${err.message}`);
     }
   };
@@ -76,9 +96,11 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
     if (!currentUser) return;
     if (!confirm('Soft-delete this comment? Content will be masked with tombstone.')) return;
     try {
+      onCommentCountChange(postId, Math.max(0, totalCount - 1));
       await apiRequest(`/posts/${postId}/comments/${commentId}`, { method: 'DELETE' });
       await fetchComments();
     } catch (err: any) {
+      onCommentCountChange(postId, totalCount);
       alert(`Delete failed: ${err.message}`);
     }
   };
@@ -86,11 +108,14 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
   const renderCommentItem = (item: CommentNode) => {
     const isAuthor = currentUser && (currentUser.id === item.authorId || currentUser.role === 'ADMIN');
     const canReply = item.depth < 3;
+    const authorName = item.author
+      ? `${item.author.firstName} ${item.author.lastName || ''}`.trim()
+      : item.authorName || 'Student';
 
     return (
       <div key={item.id} className={`comment-node depth-${item.depth}`}>
         <div className="comment-meta">
-          <span className="comment-author">u/{item.authorName}</span>
+          <span className="comment-author">u/{authorName}</span>
           <span className="comment-depth-tag">L{item.depth}</span>
           <span className="pipe">|</span>
           <span>{new Date(item.createdAt).toLocaleTimeString()}</span>
@@ -102,17 +127,15 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
         </div>
 
         <div className="comment-actions">
-          {!item.isDeleted && (
-            <button className="action-link" onClick={() => handleVoteComment(item.id)}>
-              [ ▲ {item.likeCount} ]
-            </button>
-          )}
+          <button className="action-link mini" onClick={() => handleVoteComment(item.id)}>
+            ▲ {item.likeCount || 0}
+          </button>
 
           {canReply && !item.isDeleted && (
             <>
               <span className="pipe">|</span>
               <button
-                className="action-link"
+                className="action-link mini"
                 onClick={() => setReplyingToId(replyingToId === item.id ? null : item.id)}
               >
                 [ REPLY ]
@@ -123,7 +146,7 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
           {isAuthor && !item.isDeleted && (
             <>
               <span className="pipe">|</span>
-              <button className="action-link delete" onClick={() => handleDeleteComment(item.id)}>
+              <button className="action-link mini delete" onClick={() => handleDeleteComment(item.id)}>
                 [ DELETE ]
               </button>
             </>
@@ -163,6 +186,26 @@ export function CommentDrawer({ postId, currentUser, onCommentCountChange }: Com
 
   return (
     <div className="comment-drawer">
+      {/* Telemetry Header */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '6px 10px',
+          background: 'var(--bg-dark)',
+          border: '2px solid var(--border-dark)',
+          fontSize: '10px',
+          fontWeight: 700,
+          color: 'var(--accent-red)',
+          letterSpacing: '0.05em',
+          marginBottom: '8px',
+        }}
+      >
+        <span>[ THREAD TELEMETRY ]</span>
+        <span>{totalCount} {totalCount === 1 ? 'DISPATCH' : 'DISPATCHES'} IN RECORD</span>
+      </div>
+
       {/* Input box */}
       <div className="comment-input-box">
         <textarea

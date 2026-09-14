@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Post, Club, EventItem, Ticket, User, apiRequest } from '@/lib/api';
+import { Post, Club, EventItem, Ticket, User, apiRequest, formatUserCallsign } from '@/lib/api';
 import { useRealtimeFeed, RealtimeFeedPayload } from '@/hooks/useRealtimeFeed';
 import { TickerBar } from '@/components/TickerBar';
 import { SubredditNav } from '@/components/SubredditNav';
@@ -90,6 +90,36 @@ export default function CampusHubApp() {
             ? { ...p, isDeleted: true, content: '[This post was deleted by author]' }
             : p,
         ),
+      );
+    } else if (type === 'COMMENT_CREATED') {
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id !== data.postId) return p;
+          const newCount = (p.commentCount ?? p._count?.comments ?? 0) + 1;
+          return {
+            ...p,
+            commentCount: newCount,
+            _count: {
+              likes: p.likeCount ?? p._count?.likes ?? 0,
+              comments: newCount,
+            },
+          };
+        }),
+      );
+    } else if (type === 'COMMENT_DELETED') {
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id !== data.postId) return p;
+          const newCount = Math.max(0, (p.commentCount ?? p._count?.comments ?? 0) - 1);
+          return {
+            ...p,
+            commentCount: newCount,
+            _count: {
+              likes: p.likeCount ?? p._count?.likes ?? 0,
+              comments: newCount,
+            },
+          };
+        }),
       );
     }
   }, []);
@@ -452,7 +482,18 @@ export default function CampusHubApp() {
                         currentUser={currentUser}
                         onCommentCountChange={(pId, count) => {
                           setPosts((prev) =>
-                            prev.map((p) => (p.id === pId ? { ...p, commentCount: count } : p)),
+                            prev.map((p) =>
+                              p.id === pId
+                                ? {
+                                    ...p,
+                                    commentCount: count,
+                                    _count: {
+                                      likes: p.likeCount ?? p._count?.likes ?? 0,
+                                      comments: count,
+                                    },
+                                  }
+                                : p,
+                            ),
                           );
                         }}
                       />
@@ -501,7 +542,7 @@ export default function CampusHubApp() {
             <div className="card-body">
               {currentUser ? (
                 <div className="user-session-view">
-                  <div className="user-badge">&gt;&gt; u/{currentUser.name}</div>
+                  <div className="user-badge">&gt;&gt; u/{formatUserCallsign(currentUser)}</div>
                   <div className="role-badge">ROLE: {currentUser.role}</div>
                   <div
                     style={{
