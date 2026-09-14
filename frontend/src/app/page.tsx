@@ -31,7 +31,7 @@ export default function CampusHubApp() {
 
   // Auth & Session State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [userMemberships, setUserMemberships] = useState<Set<string>>(new Set());
+  const [userMemberships, _setUserMemberships] = useState<Set<string>>(new Set());
   const [userTickets, setUserTickets] = useState<Ticket[]>([]);
 
   // Modals

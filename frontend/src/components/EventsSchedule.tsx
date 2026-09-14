@@ -13,7 +13,7 @@ interface EventsScheduleProps {
 
 export function EventsSchedule({
   events,
-  userTickets,
+  userTickets: _userTickets,
   currentUser,
   onRefreshEvents,
   onTicketClaimed,
