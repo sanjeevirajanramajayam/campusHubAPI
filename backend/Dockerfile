@@ -31,7 +31,7 @@ RUN CI=true pnpm --filter backend install --prod --ignore-scripts
 
 # STAGE 3: Production Runner
 FROM node:20-bookworm-slim AS runner
-WORKDIR /app
+WORKDIR /app/backend
 
 RUN apt-get update && apt-get install -y --no-install-recommends openssl curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
@@ -40,11 +40,11 @@ ENV PORT=5000
 
 USER node
 
-COPY --chown=node:node --from=builder /app/backend/dist ./dist
-COPY --chown=node:node --from=builder /app/node_modules ./node_modules
-COPY --chown=node:node --from=builder /app/backend/node_modules ./backend/node_modules
-COPY --chown=node:node --from=builder /app/backend/prisma ./prisma
-COPY --chown=node:node --from=builder /app/backend/package.json ./package.json
+COPY --chown=node:node --from=builder /app/node_modules /app/node_modules
+COPY --chown=node:node --from=builder /app/backend/dist /app/backend/dist
+COPY --chown=node:node --from=builder /app/backend/node_modules /app/backend/node_modules
+COPY --chown=node:node --from=builder /app/backend/prisma /app/backend/prisma
+COPY --chown=node:node --from=builder /app/backend/package.json /app/backend/package.json
 
 EXPOSE 5000
 
